@@ -18,6 +18,8 @@ export function activate(context: vscode.ExtensionContext) {
   const codeLensProvider = new DeepSightCodeLensProvider();
   const codeLensDisposable = vscode.languages.registerCodeLensProvider(
     [
+      { language: "c" },
+      { language: "cpp" },
       { language: "typescript" },
       { language: "javascript" },
       { language: "typescriptreact" },
@@ -86,8 +88,35 @@ async function analyzeCode(
 
   // Get symbol name at line for display
   const lineText = document.lineAt(line).text;
-  const symbolMatch = lineText.match(/(?:function|class|def|fn|struct|impl)\s+(\w+)|(?:const|let|var)\s+(\w+)/);
-  const anchor = symbolMatch ? (symbolMatch[1] || symbolMatch[2]) : `Line ${line + 1}`;
+
+  // Try multiple patterns for different languages
+  const patterns = [
+    // JavaScript/TypeScript: function, class, arrow function assignment
+    /(?:function|class)\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=/,
+    // Python: def, class
+    /(?:def|class)\s+(\w+)/,
+    // Go/Rust: func, fn, struct, impl
+    /(?:func|fn|struct|impl)\s+(?:\([^)]+\)\s+)?(\w+)/,
+    // C/C++/Java: function/method with return type
+    /(?:void|int|char|float|double|bool|auto|static|inline|public|private|protected|virtual|final|explicit|constexpr)\s+(?:[\w<>[\]]+\s+)*(\w+)\s*\(/,
+  ];
+
+  let symbolName: string | null = null;
+  for (const pattern of patterns) {
+    const match = lineText.match(pattern);
+    if (match) {
+      // Find the first capturing group that has a value
+      for (let i = 1; i < match.length; i++) {
+        if (match[i]) {
+          symbolName = match[i];
+          break;
+        }
+      }
+      if (symbolName) break;
+    }
+  }
+
+  const anchor = symbolName || `Line ${line + 1}`;
 
   outputChannel.appendLine(`\n${"=".repeat(50)}`);
   outputChannel.appendLine(`[${new Date().toISOString()}] Starting analysis`);

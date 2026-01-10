@@ -2,7 +2,7 @@
   "name": "deepsight",
   "displayName": "DeepSight",
   "description": "AI-powered code explanation and security auditing",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "deepsight",
   "repository": {
     "type": "git",
@@ -13,7 +13,7 @@
     "vscode": "^1.85.0"
   },
   "categories": ["Other"],
-  "activationEvents": ["onLanguage:typescript", "onLanguage:javascript", "onLanguage:python", "onLanguage:go", "onLanguage:rust", "onLanguage:java"],
+  "activationEvents": ["onLanguage:c", "onLanguage:cpp", "onLanguage:typescript", "onLanguage:javascript", "onLanguage:python", "onLanguage:go", "onLanguage:rust", "onLanguage:java"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
