@@ -1,0 +1,70 @@
+{
+  "name": "deepsight",
+  "displayName": "DeepSight",
+  "description": "AI-powered code explanation and security auditing",
+  "version": "0.1.6",
+  "publisher": "deepsight",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deepsight/deepsight"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onLanguage:typescript", "onLanguage:javascript", "onLanguage:python", "onLanguage:go", "onLanguage:rust", "onLanguage:java"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "deepsight.explain",
+        "title": "DeepSight: Explain Code"
+      },
+      {
+        "command": "deepsight.audit",
+        "title": "DeepSight: Security Audit"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "deepsight",
+          "title": "DeepSight",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "views": {
+      "deepsight": [
+        {
+          "type": "webview",
+          "id": "deepsight.resultView",
+          "name": "Analysis Result"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "DeepSight",
+      "properties": {
+        "deepsight.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "DeepSight server URL"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.0",
+    "@vscode/vsce": "^3.0.0"
+  }
+}
