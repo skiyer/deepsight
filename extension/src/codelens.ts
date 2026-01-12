@@ -8,8 +8,8 @@ export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
   private readonly languagePatterns: Record<string, RegExp[]> = {
     // C/C++
     c: [
-      // C function definitions (static, inline, extern, type qualifiers)
-      /^(?:static\s+|inline\s+|extern\s+|__inline__\s+)?(?:const\s+|volatile\s+)?(?:unsigned\s+|signed\s+|long\s+|short\s+)?(?:int\s+|void\s+|char\s+|float\s+|double\s+|bool\s+)(?:\s+\*+)?\s+(\w+)\s*\([^)]*\)\s*(?:__attribute__\s*\(\([^)]*\)\)\s*)?\{/gm,
+      // C function declarations and definitions (with or without {)
+      /^(?:static\s+|inline\s+|extern\s+|__inline__\s+)?(?:const\s+|volatile\s+)?(?:unsigned\s+|signed\s+|long\s+|short\s+)?(?:int\s+|void\s+|char\s+|float\s+|double\s+|bool\s+)\s*\*?\s+(\w+)\s*\([^)]*\)\s*(?:__attribute__\s*\(\([^)]*\)\)\s*)?(?:\s*;|\s*\{)/gm,
       // C struct definitions
       /^struct\s+(\w+)/gm,
       // C enum definitions
@@ -105,34 +105,153 @@ export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
     ],
   };
 
-  public provideCodeLenses(
+  public async provideCodeLenses(
     document: vscode.TextDocument,
-    _token: vscode.CancellationToken
-  ): vscode.CodeLens[] | Thenable<vscode.CodeLens[]> {
+    token: vscode.CancellationToken
+  ): Promise<vscode.CodeLens[]> {
+    try {
+      // 优先尝试Symbol Provider
+      const symbols = await this.getDocumentSymbols(document, token);
+      if (symbols && symbols.length > 0) {
+        console.log(`[DeepSight] Symbol Provider matched ${symbols.length} symbols in ${document.languageId} file`);
+        return this.createCodeLensesFromSymbols(symbols, document);
+      }
+      console.log(`[DeepSight] No symbols from provider, falling back to regex for ${document.languageId}`);
+    } catch (error) {
+      console.warn('[DeepSight] Symbol provider failed:', error);
+    }
+
+    // 降级到正则表达式
+    return this.createCodeLensesWithRegex(document);
+  }
+
+  private async getDocumentSymbols(
+    document: vscode.TextDocument,
+    token: vscode.CancellationToken
+  ): Promise<vscode.DocumentSymbol[] | null> {
+    try {
+      const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+        'vscode.executeDocumentSymbolProvider',
+        document.uri
+      );
+
+      if (token.isCancellationRequested) {
+        return null;
+      }
+
+      return symbols || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private isRelevantSymbol(symbol: vscode.DocumentSymbol): boolean {
+    const relevantKinds = [
+      vscode.SymbolKind.Function,
+      vscode.SymbolKind.Method,
+      vscode.SymbolKind.Class,
+      vscode.SymbolKind.Constructor,
+      vscode.SymbolKind.Interface,
+      vscode.SymbolKind.Struct,
+      vscode.SymbolKind.Enum
+    ];
+    return relevantKinds.includes(symbol.kind);
+  }
+
+  private collectRelevantSymbols(
+    symbols: vscode.DocumentSymbol[],
+    result: vscode.DocumentSymbol[] = []
+  ): vscode.DocumentSymbol[] {
+    for (const symbol of symbols) {
+      if (this.isRelevantSymbol(symbol)) {
+        result.push(symbol);
+      }
+      if (symbol.children.length > 0) {
+        this.collectRelevantSymbols(symbol.children, result);
+      }
+    }
+    return result;
+  }
+
+  private createCodeLensesFromSymbols(
+    symbols: vscode.DocumentSymbol[],
+    document: vscode.TextDocument
+  ): vscode.CodeLens[] {
+    const codeLenses: vscode.CodeLens[] = [];
+    const relevantSymbols = this.collectRelevantSymbols(symbols);
+    const lineSet = new Set<number>();
+
+    // 日志记录匹配的符号
+    const symbolCounts = new Map<string, number>();
+    for (const symbol of relevantSymbols) {
+      const kindName = vscode.SymbolKind[symbol.kind];
+      symbolCounts.set(kindName, (symbolCounts.get(kindName) || 0) + 1);
+    }
+    console.log(`[DeepSight] Matched symbols: ${Array.from(symbolCounts.entries()).map(([k, v]) => `${k}:${v}`).join(', ')}`);
+
+    for (const symbol of relevantSymbols) {
+      const line = symbol.range.start.line;
+
+      // 防止同一行重复
+      if (lineSet.has(line)) {
+        continue;
+      }
+      lineSet.add(line);
+
+      // 在符号名称前创建CodeLens
+      const range = new vscode.Range(line, 0, line, 0);
+
+      console.log(`[DeepSight] Symbol: ${symbol.name} (${vscode.SymbolKind[symbol.kind]}) at line ${line + 1}`);
+
+      // Explain按钮
+      codeLenses.push(
+        new vscode.CodeLens(range, {
+          title: "✨ 解释",
+          command: "deepsight.explain",
+          arguments: [document, line],
+        })
+      );
+
+      // Audit按钮
+      codeLenses.push(
+        new vscode.CodeLens(range, {
+          title: "🛡️ 审计",
+          command: "deepsight.audit",
+          arguments: [document, line],
+        })
+      );
+    }
+
+    return codeLenses;
+  }
+
+  private createCodeLensesWithRegex(document: vscode.TextDocument): vscode.CodeLens[] {
     const codeLenses: vscode.CodeLens[] = [];
     const text = document.getText();
     const lineSet = new Set<number>();
 
-    // Get patterns for current language
     const patterns = this.languagePatterns[document.languageId];
     if (!patterns) {
+      console.log(`[DeepSight] No regex patterns for language: ${document.languageId}`);
       return [];
     }
 
+    console.log(`[DeepSight] Using regex fallback for ${document.languageId} file`);
+
+    let totalMatches = 0;
     for (const pattern of patterns) {
       let match;
       while ((match = pattern.exec(text)) !== null) {
         const line = document.positionAt(match.index).line;
-
-        // Skip duplicate lines
         if (lineSet.has(line)) {
           continue;
         }
         lineSet.add(line);
+        totalMatches++;
 
         const range = new vscode.Range(line, 0, line, 0);
 
-        // Explain button
+        // 创建Explain和Audit按钮
         codeLenses.push(
           new vscode.CodeLens(range, {
             title: "✨ 解释",
@@ -141,7 +260,6 @@ export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
           })
         );
 
-        // Audit button
         codeLenses.push(
           new vscode.CodeLens(range, {
             title: "🛡️ 审计",
@@ -151,6 +269,8 @@ export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
         );
       }
     }
+
+    console.log(`[DeepSight] Regex matched ${totalMatches} patterns in ${document.languageId} file`);
 
     return codeLenses;
   }
