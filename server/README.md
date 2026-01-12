@@ -51,6 +51,16 @@ Enable `DEBUG_PROMPT=true` in your `.env` file to see the complete system and us
 DEBUG_PROMPT=true
 ```
 
+Server startup will show the debug status:
+```
+=== DeepSight Agent Environment Debug ===
+Platform: darwin
+Is WSL: false
+...
+DEBUG_PROMPT: ENABLED
+=========================================
+```
+
 When enabled, the server console will display:
 
 ```
@@ -67,18 +77,16 @@ When enabled, the server console will display:
 
 ```c
 void processData(int* data, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        data[i] = data[i] * 2;
-    }
-}
 ```
 
 请解释这段代码的功能和数据流。
 ================================================================================
 
-[PROMPT DEBUG] Stats: System=892 chars, User=234 chars, Total=1126 chars
+[PROMPT DEBUG] Stats: System=892 chars, User=156 chars, Total=1048 chars
 ================================================================================
 ```
+
+**Note**: Only the code at the focus line is included in the prompt, not the entire file.
 
 ### Other Debug Output
 

@@ -38,7 +38,7 @@ function logEnvironmentInfo() {
   console.log("NODE_ENV:", process.env.NODE_ENV);
   console.log("ANTHROPIC_AUTH_TOKEN:", process.env.ANTHROPIC_AUTH_TOKEN ? "***set***" : "NOT SET");
   console.log("ANTHROPIC_BASE_URL:", process.env.ANTHROPIC_BASE_URL || "NOT SET");
-  console.log("PATH:", process.env.PATH);
+  console.log("DEBUG_PROMPT:", process.env.DEBUG_PROMPT === "true" ? "ENABLED" : "disabled");
 
   try {
     const nodeVersion = execSync("node --version", { encoding: "utf-8" }).trim();
@@ -84,10 +84,17 @@ export async function* analyze(params: AnalyzeParams): AsyncGenerator<SDKMessage
 
   const systemPrompt = params.mode === "explain" ? EXPLAIN_PROMPT : AUDIT_PROMPT;
 
+  // 只提取焦点行的代码
+  const codeLines = params.code.split('\n');
+  const focusLineIndex = params.line - 1; // 转换为0-based索引
+  const focusLineCode = (focusLineIndex >= 0 && focusLineIndex < codeLines.length)
+    ? codeLines[focusLineIndex].trim()
+    : "[无法获取焦点行代码]";
+
   const userPrompt = `请分析以下代码（文件：${file}，焦点行：${params.line}）：
 
 \`\`\`
-${params.code}
+${focusLineCode}
 \`\`\`
 
 ${params.mode === "explain" ? "请解释这段代码的功能和数据流。" : "请对这段代码进行安全审计。"}`;
