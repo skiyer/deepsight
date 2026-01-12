@@ -11,10 +11,12 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+*.vsix
 
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
