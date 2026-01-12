@@ -61,14 +61,14 @@ function BlockRenderer({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case 'text':
       return (
-        <div className="content-block text-block" data-status={block.status}>
+        <div className="animate-fade-in" data-status={block.status}>
           <MarkdownRenderer content={block.content} />
         </div>
       );
 
     case 'tool':
       return (
-        <div className="content-block tool-block" data-status={block.status}>
+        <div className="animate-fade-in" data-status={block.status}>
           <ToolCall
             name={block.name}
             status={block.status === 'streaming' ? 'running' : 'done'}
@@ -79,7 +79,7 @@ function BlockRenderer({ block }: { block: ContentBlock }) {
 
     case 'thinking':
       return (
-        <div className="content-block thinking-block" data-status={block.status}>
+        <div className="animate-fade-in" data-status={block.status}>
           <Thinking content={block.content} />
         </div>
       );
@@ -123,9 +123,11 @@ export default function App({ vscode }: AppProps) {
 
   if (state.status === 'error') {
     return (
-      <div className="error-container">
-        <div className="error-icon">&#x274C;</div>
-        <div className="error-message">{state.error}</div>
+      <div className="flex flex-col items-center justify-center min-h-screen p-10 text-center">
+        <div className="text-2xl mb-3">✕</div>
+        <div className="text-[var(--vscode-errorForeground)] p-4 bg-[var(--vscode-inputValidation-errorBackground)] border border-[var(--vscode-inputValidation-errorBorder)] rounded-md max-w-[400px] word-break">
+          {state.error}
+        </div>
       </div>
     );
   }
@@ -134,9 +136,9 @@ export default function App({ vscode }: AppProps) {
   const hasBlocks = state.blocks.length > 0;
 
   return (
-    <div className="app">
+    <div className="flex flex-col min-h-screen">
       <Header anchor={state.anchor} mode={state.mode} />
-      <div className="content">
+      <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-4">
         {/* Render all blocks in order */}
         {state.blocks.map((block) => (
           <BlockRenderer key={block.id} block={block} />

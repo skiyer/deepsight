@@ -8,7 +8,7 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className="markdown-content">
+    <div className="prose prose-sm max-w-none break-words">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
