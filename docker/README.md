@@ -21,14 +21,45 @@ cp extension/deepsight-*.vsix docker/deepsight.vsix
 ### 2. 构建镜像
 
 ```bash
-cd /path/to/deepsight
-docker build -t deepsight-codeserver -f docker/Dockerfile .
+cd docker
+docker build -t deepsight-codeserver -f Dockerfile .
 ```
 
 构建参数说明：
 - `-t deepsight-codeserver` - 镜像名称
-- `-f docker/Dockerfile` - Dockerfile 路径
-- `.` - 构建上下文为项目根目录（用于访问 VSIX 文件）
+- `-f Dockerfile` - Dockerfile 路径（使用 docker/ 目录作为构建上下文）
+
+### macOS ARM64 用户
+
+在 Apple Silicon Mac 上使用 OrbStack 构建时，默认会生成 arm64 镜像。如需在 Intel/AMD 服务器上运行，需明确指定平台：
+
+```bash
+cd docker
+docker build --platform linux/amd64 -t deepsight-codeserver:amd64 -f Dockerfile .
+```
+
+### 本地测试 amd64 镜像
+
+在 Apple Silicon Mac 上运行 amd64 镜像，需添加 `--platform linux/amd64` 参数：
+
+```bash
+docker run --platform linux/amd64 -d \
+  --name deepsight-codeserver \
+  -p 8443:8443 \
+  -e TZ=Asia/Shanghai \
+  -v ~/code-server-config:/config \
+  deepsight-codeserver:latest
+```
+
+### 推送到 Docker Hub（可选）
+
+将镜像推送到 Docker Hub 便于在其他机器上使用：
+
+```bash
+docker login
+docker tag deepsight-codeserver:amd64 yourusername/deepsight-codeserver:latest
+docker push yourusername/deepsight-codeserver:latest
+```
 
 ## 使用说明
 
