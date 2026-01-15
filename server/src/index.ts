@@ -21,7 +21,7 @@ app.get("/health", (c) => {
 // Analyze endpoint
 app.route("/analyze", analyzeRouter);
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.DEEPSIGHT_PORT) || 3000;
 
 serve({
   fetch: app.fetch,

@@ -38,7 +38,7 @@ pnpm start
 |----------|-------------|---------|
 | `ANTHROPIC_AUTH_TOKEN` | Required. Your Anthropic API authentication token | - |
 | `ANTHROPIC_BASE_URL` | Optional. Anthropic API base URL | `https://api.anthropic.com` |
-| `PORT` | Optional. Server port | `3000` |
+| `DEEPSIGHT_PORT` | Optional. Server port (use `DEEPSIGHT_PORT` in Docker to avoid conflict with code-server) | `3000` |
 | `DEBUG_PROMPT` | Optional. Enable detailed prompt logging. See Debug section. | `false` |
 
 ## Debug

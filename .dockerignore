@@ -1,0 +1,13 @@
+.git
+.gitignore
+*.md
+node_modules
+server/node_modules
+extension/node_modules
+extension/webview-ui/node_modules
+dist
+!server/dist
+.deploy
+.vscode
+*.log
+.DS_Store
