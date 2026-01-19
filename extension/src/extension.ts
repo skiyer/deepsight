@@ -6,6 +6,7 @@ import { DeepSightViewProvider } from "./webview";
 let outputChannel: vscode.OutputChannel;
 
 let viewProvider: DeepSightViewProvider;
+let isAnalyzing = false;
 
 export function activate(context: vscode.ExtensionContext) {
   // Create output channel for debugging
@@ -77,6 +78,12 @@ async function analyzeCode(
   line: number,
   mode: "explain" | "audit"
 ) {
+  if (isAnalyzing) {
+    vscode.window.showInformationMessage("DeepSight: 正在分析中，请等待完成。");
+    return;
+  }
+  isAnalyzing = true;
+
   const config = vscode.workspace.getConfiguration("deepsight");
   const serverUrl = config.get<string>("serverUrl", "http://localhost:3000");
 
@@ -196,6 +203,8 @@ async function analyzeCode(
     outputChannel.appendLine(`[Error] ${message}`);
     viewProvider.setError(message);
     vscode.window.showErrorMessage(`DeepSight: ${message}`);
+  } finally {
+    isAnalyzing = false;
   }
 }
 
