@@ -306,17 +306,17 @@ function handleSSEMessage(msg: any, msgIndex: number): boolean {
 function getToolDisplayInfo(toolName: string, input: any): string {
   switch (toolName) {
     case "Read":
-      return input.file_path ? `📄 ${input.file_path.split(/[/\\]/).pop()}` : "";
+      return input.file_path ? `${input.file_path.split(/[/\\]/).pop()}` : "";
     case "Glob":
-      return input.pattern ? `🔍 ${input.pattern}` : "";
+      return input.pattern ? `${input.pattern}` : "";
     case "Grep":
-      return input.pattern ? `🔎 "${input.pattern}"` : "";
+      return input.pattern ? `"${input.pattern}"` : "";
     case "Bash":
-      return input.command ? `$ ${input.command.substring(0, 40)}${input.command.length > 40 ? "..." : ""}` : "";
+      return input.command ? `${input.command.substring(0, 40)}${input.command.length > 40 ? "..." : ""}` : "";
     case "Write":
-      return input.file_path ? `✏️ ${input.file_path.split(/[/\\]/).pop()}` : "";
+      return input.file_path ? `${input.file_path.split(/[/\\]/).pop()}` : "";
     case "Edit":
-      return input.file_path ? `✂️ ${input.file_path.split(/[/\\]/).pop()}` : "";
+      return input.file_path ? `${input.file_path.split(/[/\\]/).pop()}` : "";
     default:
       return "";
   }

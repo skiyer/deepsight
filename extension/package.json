@@ -2,7 +2,7 @@
   "name": "deepsight",
   "displayName": "DeepSight",
   "description": "AI-powered code explanation and security auditing",
-  "version": "0.1.9",
+  "version": "0.1.11",
   "publisher": "deepsight",
   "repository": {
     "type": "git",

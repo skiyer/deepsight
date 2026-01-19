@@ -21,8 +21,8 @@ export function Header({ anchor, mode }: HeaderProps) {
         className={`
           inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full
           ${isExplain
-            ? 'bg-[#36a6ff]/15 text-[#36a6ff]'
-            : 'bg-[#d97706]/15 text-[#d97706]'
+            ? 'bg-[#d97706]/15 text-[#d97706]'
+            : 'bg-[#36a6ff]/15 text-[#36a6ff]'
           }
         `}
       >

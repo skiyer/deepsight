@@ -10,13 +10,13 @@ export function EmptyState() {
       </div>
       <div className="px-4 py-3 bg-[var(--vscode-textCodeBlock-background)] rounded-md text-xs text-[var(--vscode-descriptionForeground)]">
         点击代码上方的{' '}
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#36a6ff]/15 text-[#36a6ff] rounded text-xs font-medium">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#d97706]/15 text-[#d97706] rounded text-xs font-medium">
           <Sparkles className="w-3 h-3" />
           解释
         </span>
         {' '}
         或{' '}
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#d97706]/15 text-[#d97706] rounded text-xs font-medium">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#36a6ff]/15 text-[#36a6ff] rounded text-xs font-medium">
           <Shield className="w-3 h-3" />
           审计
         </span>
