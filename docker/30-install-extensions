@@ -7,13 +7,13 @@ echo "Checking for pre-bundled extensions in $VSIX_DIR..."
 
 # 遍历目录安装所有 .vsix 文件
 if [ -d "$VSIX_DIR" ]; then
-    for ext in "$VSIX_DIR"/*.vsix; do
-        if [ -f "$ext" ]; then
-            echo "Installing extension: $ext"
-            # 使用 code-server 命令安装，指定扩展目录为用户持久化目录
-            /app/code-server/bin/code-server --install-extension "$ext" --extensions-dir /config/extensions
-        fi
-    done
+  for ext in "$VSIX_DIR"/*.vsix; do
+    if [ -f "$ext" ]; then
+      echo "Installing extension: $ext"
+      # 使用 code-server 命令安装，指定扩展目录为用户持久化目录
+      s6-setuidgid abc /app/code-server/bin/code-server --install-extension "$ext" --extensions-dir /config/extensions
+    fi
+  done
 fi
 
 echo "Extension installation check complete."
