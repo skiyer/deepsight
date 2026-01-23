@@ -165,6 +165,15 @@ docker logs code-server | grep "Installing extension"
 2. 在 code-server 中打开开发者工具（F12）查看网络请求
 3. 检查 DeepSight Debug 输出通道的日志
 
+### 域名访问白屏（`crypto.subtle` 不可用）
+
+当使用域名访问而不是 `127.0.0.1`/`localhost` 时，如果证书对域名无效或不是可信 HTTPS，会导致浏览器判定为非安全上下文，从而禁用 WebView（报错：`ERR 'crypto.subtle' is not available so webviews will not work.`）。
+
+解决方式：
+1. 为域名配置可信 HTTPS 证书（推荐：使用 Caddy/Nginx/Traefik 反代并签发 Let's Encrypt）。
+2. 本地开发可用 `mkcert` 为域名签发并信任证书，再配置到 code-server。
+3. 临时绕过：使用 `https://127.0.0.1:8443` 或 `https://localhost:8443` 访问。
+
 ### 权限问题
 
 确保挂载的配置目录权限正确：
