@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 
+type PageMode = "analysis" | "wiki";
+
 // Block types
 interface BaseBlock {
   id: string;
@@ -25,12 +27,46 @@ interface ThinkingBlock extends BaseBlock {
 type ContentBlock = TextBlock | ToolBlock | ThinkingBlock;
 
 // Complete state that Extension maintains as single source of truth
+type WikiPageType =
+  | "home"
+  | "architecture"
+  | "modules"
+  | "dataflow"
+  | "trust-boundaries"
+  | "attack-surface"
+  | "custom";
+
+interface WikiPageMeta {
+  path: string; // relative to .deepsight/wiki
+  title: string;
+  type: WikiPageType;
+  order: number;
+}
+
+interface WikiState {
+  status: "idle" | "loading" | "error";
+  workspaceRoot: string;
+  pages: WikiPageMeta[];
+  currentPath: string;
+  content: string;
+  dirty: boolean;
+  error: string;
+  lastSavedAt: string;
+}
+
 interface ViewState {
+  // Existing analysis state (kept for minimal UI impact)
   status: "empty" | "loading" | "streaming" | "done" | "error";
   anchor: string;
   mode: "explain" | "audit";
   blocks: ContentBlock[];
   error: string;
+
+  // New: top-level page selector
+  page: PageMode;
+
+  // New: wiki state
+  wiki: WikiState;
 }
 
 export class DeepSightViewProvider implements vscode.WebviewViewProvider {
@@ -46,11 +82,37 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
     mode: "explain",
     blocks: [],
     error: "",
+
+    page: "analysis",
+    wiki: {
+      status: "idle",
+      workspaceRoot: "",
+      pages: [],
+      currentPath: "",
+      content: "",
+      dirty: false,
+      error: "",
+      lastSavedAt: "",
+    },
   };
 
   private _blockIdCounter = 0;
 
+  private _wikiWatchers: Map<string, vscode.FileSystemWatcher> = new Map();
+  private _wikiRefreshTimer: NodeJS.Timeout | undefined;
+
   constructor(private readonly _extensionUri: vscode.Uri) {}
+
+  public dispose() {
+    for (const watcher of this._wikiWatchers.values()) {
+      watcher.dispose();
+    }
+    this._wikiWatchers.clear();
+    if (this._wikiRefreshTimer) {
+      clearTimeout(this._wikiRefreshTimer);
+      this._wikiRefreshTimer = undefined;
+    }
+  }
 
   // Generate unique block ID
   private _generateBlockId(): string {
@@ -83,16 +145,43 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlContent();
 
     // Listen for ready message from webview
-    webviewView.webview.onDidReceiveMessage((message) => {
-      if (message.type === "ready") {
+    webviewView.webview.onDidReceiveMessage(async (message) => {
+      if (message?.type === "ready") {
         this._isReady = true;
-        // Send complete state snapshot
         this._syncState();
-        // Resolve waiting promise
         if (this._resolveWhenReady) {
           this._resolveWhenReady();
           this._resolveWhenReady = undefined;
         }
+        return;
+      }
+
+      try {
+        switch (message?.type) {
+          case "navigate": {
+            await this.navigateTo(message.page as PageMode);
+            break;
+          }
+          case "wiki_list": {
+            await this._refreshWikiPages();
+            break;
+          }
+          case "wiki_open": {
+            await this._openWikiPage(String(message.path || ""));
+            break;
+          }
+          case "wiki_open_in_editor": {
+            await this._openWikiPageInEditor(String(message.path || ""));
+            break;
+          }
+          default:
+            break;
+        }
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        this._state.wiki.status = "error";
+        this._state.wiki.error = error;
+        this._syncState();
       }
     });
 
@@ -123,8 +212,262 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
       mode,
       blocks: [],
       error: "",
+
+      page: this._state.page,
+      wiki: this._state.wiki,
     };
     this._syncState();
+  }
+
+  public async navigateTo(page: PageMode): Promise<void> {
+    this._state.page = page;
+    if (page === "wiki") {
+      await this._ensureWikiInitialized();
+      if (!this._state.wiki.pages.length) {
+        await this._refreshWikiPages();
+      }
+      if (!this._state.wiki.currentPath && this._state.wiki.pages.length) {
+        await this._openWikiPage(this._state.wiki.pages[0].path);
+      }
+    }
+    this._syncState();
+  }
+
+  private _getWorkspaceRootUri(): vscode.Uri | undefined {
+    const activeDoc = vscode.window.activeTextEditor?.document;
+    if (activeDoc) {
+      const folder = vscode.workspace.getWorkspaceFolder(activeDoc.uri);
+      if (folder) return folder.uri;
+    }
+    return vscode.workspace.workspaceFolders?.[0]?.uri;
+  }
+
+  private _wikiDir(root: vscode.Uri): vscode.Uri {
+    return vscode.Uri.joinPath(root, ".deepsight", "wiki");
+  }
+
+  private _wikiIndexUri(root: vscode.Uri): vscode.Uri {
+    return vscode.Uri.joinPath(this._wikiDir(root), "index.json");
+  }
+
+  private _wikiPageUri(root: vscode.Uri, relativePath: string): vscode.Uri {
+    const normalized = relativePath.replace(/^\/+/, "");
+    return vscode.Uri.joinPath(this._wikiDir(root), ...normalized.split("/"));
+  }
+
+  private async _exists(uri: vscode.Uri): Promise<boolean> {
+    try {
+      await vscode.workspace.fs.stat(uri);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private _defaultWikiIndex(): { version: number; pages: WikiPageMeta[] } {
+    return {
+      version: 1,
+      pages: [
+        { path: "Home.md", title: "Home", type: "home", order: 1 },
+        { path: "Architecture.md", title: "System Architecture", type: "architecture", order: 2 },
+        { path: "Modules.md", title: "Modules", type: "modules", order: 3 },
+        { path: "Dataflow.md", title: "Dataflow", type: "dataflow", order: 4 },
+        { path: "TrustBoundaries.md", title: "Trust Boundaries", type: "trust-boundaries", order: 5 },
+        { path: "AttackSurface.md", title: "Attack Surface", type: "attack-surface", order: 6 },
+      ],
+    };
+  }
+
+  private _defaultWikiPageContent(meta: WikiPageMeta): string {
+    const now = new Date().toISOString();
+    const header = `---\ntitle: ${meta.title}\ntype: ${meta.type}\nupdated: ${now}\n---\n\n`;
+
+    switch (meta.type) {
+      case "home":
+        return (
+          header +
+          `# ${meta.title}\n\n` +
+          `本目录用于沉淀面向安全审计/渗透的系统级分析 Wiki（适配超大规模仓库）。\n\n` +
+          `建议从以下页面开始：\n\n` +
+          `- System Architecture\n- Modules\n- Dataflow\n- Trust Boundaries\n- Attack Surface\n`
+        );
+      case "architecture":
+        return (
+          header +
+          `# ${meta.title}\n\n` +
+          `## 目标\n- 用一句话描述系统做什么\n- 明确核心边界/依赖（进程、服务、库、硬件等）\n\n` +
+          `## 组件分解\n- 组件/子系统列表\n- 关键接口\n\n` +
+          `## 架构图（可选）\n\n\`\`\`\n(这里可放 Mermaid/Graphviz 源码，MVP 先以代码块展示)\n\`\`\`\n`
+        );
+      case "modules":
+        return (
+          header +
+          `# ${meta.title}\n\n` +
+          `按模块列出：职责、入口点、关键 API、依赖、常见风险。\n\n` +
+          `## 模块清单\n- [ ] 模块 A\n- [ ] 模块 B\n\n` +
+          `## 模块模板\n- **职责**：\n- **入口**：\n- **关键数据**：\n- **信任假设**：\n- **高风险点**：\n- **代码证据**：\n`
+        );
+      case "dataflow":
+        return (
+          header +
+          `# ${meta.title}\n\n` +
+          `聚焦“可控输入 -> 关键处理 -> 敏感 sink”的端到端路径。\n\n` +
+          `## 关键数据对象\n- 认证令牌\n- 配置/策略\n- IPC 消息\n\n` +
+          `## 数据流图\n\n\`\`\`\n(建议按子系统拆分，MVP 先以源码块记录)\n\`\`\`\n`
+        );
+      case "trust-boundaries":
+        return (
+          header +
+          `# ${meta.title}\n\n` +
+          `列出边界类型、穿越点、校验逻辑与可利用假设。\n\n` +
+          `## 边界清单\n- 进程边界\n- 权限边界\n- 网络边界\n- 用户态/内核态\n\n` +
+          `## 穿越点模板\n- **边界**：\n- **入口**：\n- **校验/鉴权**：\n- **失败模式**：\n- **代码证据**：\n`
+        );
+      case "attack-surface":
+        return (
+          header +
+          `# ${meta.title}\n\n` +
+          `## 对外暴露面\n- 网络接口\n- IPC\n- 文件/设备\n- 插件/扩展点\n\n` +
+          `## 测试清单\n- [ ] 输入验证\n- [ ] 权限校验\n- [ ] 序列化/反序列化\n- [ ] 资源耗尽\n`
+        );
+      default:
+        return header + `# ${meta.title}\n\n`;
+    }
+  }
+
+  private async _ensureWikiInitialized(): Promise<void> {
+    this._state.wiki.status = "loading";
+    this._state.wiki.error = "";
+    this._syncState();
+
+    const root = this._getWorkspaceRootUri();
+    if (!root) {
+      this._state.wiki.status = "error";
+      this._state.wiki.error = "No workspace folder found.";
+      this._syncState();
+      return;
+    }
+
+    this._state.wiki.workspaceRoot = root.fsPath;
+
+    this._ensureWikiWatcher(root);
+
+    const wikiDir = this._wikiDir(root);
+    await vscode.workspace.fs.createDirectory(wikiDir);
+
+    const indexUri = this._wikiIndexUri(root);
+    if (!(await this._exists(indexUri))) {
+      const index = this._defaultWikiIndex();
+      const encoder = new TextEncoder();
+      await vscode.workspace.fs.writeFile(indexUri, encoder.encode(JSON.stringify(index, null, 2)));
+
+      for (const page of index.pages) {
+        const pageUri = this._wikiPageUri(root, page.path);
+        if (!(await this._exists(pageUri))) {
+          await vscode.workspace.fs.writeFile(
+            pageUri,
+            encoder.encode(this._defaultWikiPageContent(page))
+          );
+        }
+      }
+    }
+
+    this._state.wiki.status = "idle";
+    this._syncState();
+  }
+
+  private _ensureWikiWatcher(root: vscode.Uri) {
+    const key = root.fsPath;
+    if (this._wikiWatchers.has(key)) return;
+
+    const pattern = new vscode.RelativePattern(root, ".deepsight/wiki/**");
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+    const scheduleRefresh = () => {
+      if (this._wikiRefreshTimer) {
+        clearTimeout(this._wikiRefreshTimer);
+      }
+      this._wikiRefreshTimer = setTimeout(async () => {
+        try {
+          // Keep UI in sync with disk edits
+          await this._refreshWikiPages();
+          if (this._state.page === "wiki" && this._state.wiki.currentPath) {
+            await this._openWikiPage(this._state.wiki.currentPath);
+          }
+        } catch {
+          // ignore
+        }
+      }, 200);
+    };
+
+    watcher.onDidChange(scheduleRefresh);
+    watcher.onDidCreate(scheduleRefresh);
+    watcher.onDidDelete(scheduleRefresh);
+
+    this._wikiWatchers.set(key, watcher);
+  }
+
+  private async _loadWikiIndex(root: vscode.Uri): Promise<{ version: number; pages: WikiPageMeta[] }> {
+    const indexUri = this._wikiIndexUri(root);
+    const bytes = await vscode.workspace.fs.readFile(indexUri);
+    const text = new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(text);
+    const pages = Array.isArray(parsed?.pages) ? (parsed.pages as WikiPageMeta[]) : [];
+    return { version: Number(parsed?.version || 1), pages };
+  }
+
+  private async _writeWikiIndex(root: vscode.Uri, index: { version: number; pages: WikiPageMeta[] }): Promise<void> {
+    const indexUri = this._wikiIndexUri(root);
+    const encoder = new TextEncoder();
+    await vscode.workspace.fs.writeFile(indexUri, encoder.encode(JSON.stringify(index, null, 2)));
+  }
+
+  private async _refreshWikiPages(): Promise<void> {
+    const root = this._getWorkspaceRootUri();
+    if (!root) {
+      this._state.wiki.status = "error";
+      this._state.wiki.error = "No workspace folder found.";
+      this._syncState();
+      return;
+    }
+    await this._ensureWikiInitialized();
+    const index = await this._loadWikiIndex(root);
+    this._state.wiki.pages = [...index.pages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    this._state.wiki.status = "idle";
+    this._syncState();
+  }
+
+  private async _openWikiPage(relativePath: string): Promise<void> {
+    const root = this._getWorkspaceRootUri();
+    if (!root) return;
+    await this._ensureWikiInitialized();
+
+    const safePath = relativePath.trim();
+    if (!safePath) return;
+
+    const uri = this._wikiPageUri(root, safePath);
+    const bytes = await vscode.workspace.fs.readFile(uri);
+    const content = new TextDecoder().decode(bytes);
+
+    this._state.wiki.currentPath = safePath;
+    this._state.wiki.content = content;
+    this._state.wiki.dirty = false;
+    this._state.wiki.error = "";
+    this._state.wiki.status = "idle";
+    this._syncState();
+  }
+
+  private async _openWikiPageInEditor(relativePath: string): Promise<void> {
+    const root = this._getWorkspaceRootUri();
+    if (!root) return;
+    await this._ensureWikiInitialized();
+
+    const safePath = relativePath.trim() || this._state.wiki.currentPath;
+    if (!safePath) return;
+
+    const uri = this._wikiPageUri(root, safePath);
+    const doc = await vscode.workspace.openTextDocument(uri);
+    await vscode.window.showTextDocument(doc, { preview: false });
   }
 
   // Start a new block

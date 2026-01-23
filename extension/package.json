@@ -24,6 +24,10 @@
       {
         "command": "deepsight.audit",
         "title": "DeepSight: Security Audit"
+      },
+      {
+        "command": "deepsight.openWiki",
+        "title": "DeepSight: Open Wiki"
       }
     ],
     "viewsContainers": {
@@ -40,7 +44,7 @@
         {
           "type": "webview",
           "id": "deepsight.resultView",
-          "name": "Analysis Result"
+          "name": "Analysis / Wiki"
         }
       ]
     },

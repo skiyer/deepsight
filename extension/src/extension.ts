@@ -55,6 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  const openWikiCommand = vscode.commands.registerCommand("deepsight.openWiki", async () => {
+    await vscode.commands.executeCommand("deepsight.resultView.focus");
+    await viewProvider.navigateTo("wiki");
+  });
+
   // Command to show debug output
   const showDebugCommand = vscode.commands.registerCommand(
     "deepsight.showDebug",
@@ -66,8 +71,10 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     codeLensDisposable,
     webviewDisposable,
+    viewProvider,
     explainCommand,
     auditCommand,
+    openWikiCommand,
     showDebugCommand,
     outputChannel
   );
@@ -134,6 +141,9 @@ async function analyzeCode(
 
   // Focus the DeepSight view first (webview 重建时会自动恢复状态)
   await vscode.commands.executeCommand("deepsight.resultView.focus");
+
+  // Ensure analysis output is visible
+  await viewProvider.navigateTo("analysis");
 
   // Set loading state immediately
   viewProvider.setLoading(`${fileName}:${anchor}`, mode);
