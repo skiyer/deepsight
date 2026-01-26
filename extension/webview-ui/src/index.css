@@ -68,3 +68,11 @@ body {
   font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
   font-size: 0.9em;
 }
+
+/* Prevent default prose pre styling (we render our own CodeBlock) */
+.prose pre {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}

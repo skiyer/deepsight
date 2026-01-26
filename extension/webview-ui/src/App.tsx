@@ -157,7 +157,7 @@ export default function App({ vscode }: AppProps) {
     try {
       const raw = window.localStorage.getItem('deepsight_wiki_sidebar_width');
       const n = raw ? Number(raw) : NaN;
-      return Number.isFinite(n) && n > 0 ? n : 260;
+      return Number.isFinite(n) && n > 0 ? n : 120;
     } catch {
       return 260;
     }
@@ -240,8 +240,17 @@ export default function App({ vscode }: AppProps) {
       if (!trimmed || trimmed.startsWith('#')) continue;
       const idx = trimmed.indexOf(':');
       if (idx === -1) continue;
-      const key = trimmed.slice(0, idx).trim();
-      const value = trimmed.slice(idx + 1).trim();
+      let key = trimmed.slice(0, idx).trim();
+      let value = trimmed.slice(idx + 1).trim();
+
+      // Format time fields (ISO 8601 format)
+      if ((key === 'updated' || key === 'created') && value) {
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+          value = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+      }
+
       if (key) out[key] = value;
     }
     return out;
@@ -281,7 +290,7 @@ export default function App({ vscode }: AppProps) {
 
     const onMove = (ev: MouseEvent) => {
       const dx = ev.clientX - startX;
-      const next = clamp(startWidth + dx, 180, 520);
+      const next = clamp(startWidth + dx, 120, 520);
       setWikiSidebarWidth(next);
       try {
         window.localStorage.setItem('deepsight_wiki_sidebar_width', String(next));
@@ -378,13 +387,12 @@ export default function App({ vscode }: AppProps) {
                   return (
                     <div className="h-full overflow-y-auto p-4 flex flex-col gap-3">
                       {hasMeta ? (
-                        <div className="text-xs border border-[var(--vscode-panel-border)] rounded p-3 bg-[var(--vscode-editorWidget-background)]">
-                          <div className="font-semibold mb-2">Metadata</div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        <div className="text-[11px] border border-[var(--vscode-panel-border)] rounded p-3 bg-[var(--vscode-editorWidget-background)] text-[var(--vscode-descriptionForeground)]">
+                          <div className="grid grid-cols-1 gap-y-1">
                             {Object.entries(meta).map(([k, v]) => (
                               <div key={k} className="flex gap-2 min-w-0">
-                                <span className="opacity-70">{k}</span>
-                                <span className="truncate">{v}</span>
+                                <span className="opacity-70 font-medium">{k}</span>
+                                <span className="truncate opacity-90">{v}</span>
                               </div>
                             ))}
                           </div>

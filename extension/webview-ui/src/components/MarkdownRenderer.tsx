@@ -12,13 +12,13 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ className, children, ...props }) {
+          code({ className, children, inline, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
             const codeString = String(children).replace(/\n$/, '');
 
-            // Check if it's a code block (has language) or inline code
-            if (match) {
-              return <CodeBlock language={match[1]} code={codeString} />;
+            // Code block (fenced or indented). Even if no language is specified.
+            if (!inline) {
+              return <CodeBlock language={match?.[1] || ''} code={codeString} />;
             }
 
             // Inline code
