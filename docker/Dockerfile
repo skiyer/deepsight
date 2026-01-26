@@ -14,7 +14,7 @@ COPY --from=node_source /usr/local/lib /usr/local/lib
 # --- 2. 系统依赖与 pnpm 激活 ---
 RUN mkdir -p /bg-extensions /custom-services.d \
     && apt-get update \
-    && apt-get install -y --no-install-recommends clangd curl \
+    && apt-get install -y --no-install-recommends ca-certificates clangd curl \
     && node --version && npm --version \
     && npm install -g pnpm \
     && npm cache clean --force \
@@ -50,3 +50,14 @@ COPY server/dist ./dist
 RUN printf '#!/usr/bin/with-contenv bash\n\nexec s6-setuidgid abc node /bg/dist/index.js\n' \
     > /custom-services.d/svc-deepsight-server \
     && chmod +x /custom-services.d/svc-deepsight-server
+
+# --- 7. 预装 Claude Code（二进制放到 /usr/local/bin，避免被 /config 挂载覆盖） ---
+RUN set -eux; \
+    GCS_BUCKET="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"; \
+    version="$(curl -fsSL "$GCS_BUCKET/latest")"; \
+    checksum="$(curl -fsSL "$GCS_BUCKET/$version/manifest.json" | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const m=JSON.parse(d);const p=m.platforms?.["linux-x64"]?.checksum||"";process.stdout.write(p);});')"; \
+    test -n "$checksum"; \
+    curl -fsSL -o /usr/local/bin/claude "$GCS_BUCKET/$version/linux-x64/claude"; \
+    echo "$checksum  /usr/local/bin/claude" | sha256sum -c -; \
+    chmod +x /usr/local/bin/claude; \
+    /usr/local/bin/claude --version
