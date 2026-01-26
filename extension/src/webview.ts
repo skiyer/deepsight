@@ -142,9 +142,7 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
-    webviewView.webview.html = this._getHtmlContent();
-
-    // Listen for ready message from webview
+    // Listen for messages from webview (register BEFORE setting html to avoid missing early 'ready')
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (message?.type === "ready") {
         this._isReady = true;
@@ -184,6 +182,8 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
         this._syncState();
       }
     });
+
+    webviewView.webview.html = this._getHtmlContent();
 
     // Handle visibility changes - resync state when becoming visible
     webviewView.onDidChangeVisibility(() => {
@@ -268,12 +268,12 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
     return {
       version: 1,
       pages: [
-        { path: "Home.md", title: "Home", type: "home", order: 1 },
-        { path: "Architecture.md", title: "System Architecture", type: "architecture", order: 2 },
-        { path: "Modules.md", title: "Modules", type: "modules", order: 3 },
-        { path: "Dataflow.md", title: "Dataflow", type: "dataflow", order: 4 },
-        { path: "TrustBoundaries.md", title: "Trust Boundaries", type: "trust-boundaries", order: 5 },
-        { path: "AttackSurface.md", title: "Attack Surface", type: "attack-surface", order: 6 },
+        { path: "Home.md", title: "主页", type: "home", order: 1 },
+        { path: "Architecture.md", title: "系统架构", type: "architecture", order: 2 },
+        { path: "Modules.md", title: "模块", type: "modules", order: 3 },
+        { path: "Dataflow.md", title: "数据流", type: "dataflow", order: 4 },
+        { path: "TrustBoundaries.md", title: "信任边界", type: "trust-boundaries", order: 5 },
+        { path: "AttackSurface.md", title: "攻击面", type: "attack-surface", order: 6 },
       ],
     };
   }
@@ -607,7 +607,7 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource};">
   <link rel="stylesheet" href="${styleUri}">
   <title>DeepSight</title>
 </head>
