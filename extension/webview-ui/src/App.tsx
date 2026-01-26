@@ -153,6 +153,16 @@ export default function App({ vscode }: AppProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScrollPaused, setAutoScrollPaused] = useState(false);
 
+  const [wikiSidebarWidth, setWikiSidebarWidth] = useState<number>(() => {
+    try {
+      const raw = window.localStorage.getItem('deepsight_wiki_sidebar_width');
+      const n = raw ? Number(raw) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : 260;
+    } catch {
+      return 260;
+    }
+  });
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message = event.data;
@@ -244,11 +254,6 @@ export default function App({ vscode }: AppProps) {
     vscode.postMessage({ type: 'navigate', page });
   };
 
-  const openWikiInEditor = () => {
-    if (!state.wiki.currentPath) return;
-    vscode.postMessage({ type: 'wiki_open_in_editor', path: state.wiki.currentPath });
-  };
-
   const openWikiPage = (path: string) => {
     vscode.postMessage({ type: 'wiki_open', path });
   };
@@ -264,6 +269,36 @@ export default function App({ vscode }: AppProps) {
   const hasBlocks = state.blocks.length > 0;
   const isStreaming = state.status === 'streaming';
 
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+  const beginResizeWikiSidebar = (e: React.MouseEvent) => {
+    if (state.page !== 'wiki') return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startWidth = wikiSidebarWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const next = clamp(startWidth + dx, 180, 520);
+      setWikiSidebarWidth(next);
+      try {
+        window.localStorage.setItem('deepsight_wiki_sidebar_width', String(next));
+      } catch {
+        // ignore
+      }
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <Header
@@ -272,13 +307,15 @@ export default function App({ vscode }: AppProps) {
         anchor={state.anchor}
         mode={state.mode}
         wikiTitle={currentWikiTitle}
-        onOpenWikiInEditor={openWikiInEditor}
       />
 
       {state.page === 'wiki' ? (
         <div className="flex-1 min-h-0 flex overflow-hidden">
           {/* Sidebar */}
-          <div className="w-[260px] border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] flex flex-col">
+          <div
+            className="border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] flex flex-col"
+            style={{ width: `${wikiSidebarWidth}px` }}
+          >
             <div className="p-3 flex flex-col gap-2">
               <div className="flex gap-2">
                 <button
@@ -319,22 +356,17 @@ export default function App({ vscode }: AppProps) {
             </div>
           </div>
 
+          {/* Resize handle */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            className="w-1 cursor-col-resize bg-transparent hover:bg-[var(--vscode-panel-border)]"
+            onMouseDown={beginResizeWikiSidebar}
+            title="Drag to resize"
+          />
+
           {/* Main */}
           <div className="flex-1 min-w-0 flex flex-col">
-            <div className="px-4 py-2 border-b border-[var(--vscode-panel-border)] flex items-center justify-between gap-2">
-              <div className="text-xs opacity-70 truncate">
-                {state.wiki.workspaceRoot ? `${state.wiki.workspaceRoot}/.deepsight/wiki/${state.wiki.currentPath}` : ''}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={openWikiInEditor}
-                  className="px-2 py-1 text-xs rounded border border-[var(--vscode-panel-border)]"
-                >
-                  Open
-                </button>
-              </div>
-            </div>
-
             <div className="flex-1 min-h-0 overflow-hidden">
               {!state.wiki.currentPath ? (
                 <div className="p-6 text-sm opacity-70">Select a wiki page from the left.</div>

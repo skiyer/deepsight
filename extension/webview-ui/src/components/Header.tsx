@@ -1,4 +1,4 @@
-import { BookOpen, ExternalLink, MapPin, Sparkles, Shield } from 'lucide-react';
+import { BookOpen, MapPin, Sparkles, Shield } from 'lucide-react';
 
 type PageMode = 'analysis' | 'wiki';
 
@@ -9,10 +9,9 @@ interface HeaderProps {
   mode: 'explain' | 'audit';
 
   wikiTitle?: string;
-  onOpenWikiInEditor?: () => void;
 }
 
-export function Header({ page, onNavigate, anchor, mode, wikiTitle, onOpenWikiInEditor }: HeaderProps) {
+export function Header({ page, onNavigate, anchor, mode, wikiTitle }: HeaderProps) {
   const isExplain = mode === 'explain';
 
   const tabClass = (active: boolean) =>
@@ -77,16 +76,7 @@ export function Header({ page, onNavigate, anchor, mode, wikiTitle, onOpenWikiIn
             </>
           )}
         </span>
-      ) : (
-        <button
-          onClick={onOpenWikiInEditor}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)]"
-          title="Open wiki page in VS Code editor"
-        >
-          <ExternalLink className="w-3 h-3" />
-          在编辑器中打开
-        </button>
-      )}
+      ) : null}
     </div>
   );
 }
