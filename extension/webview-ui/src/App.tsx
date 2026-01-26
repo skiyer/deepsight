@@ -136,15 +136,20 @@ function BlockRenderer({ block }: { block: ContentBlock }) {
 export default function App({ vscode }: AppProps) {
   // 优先从 getState 恢复（WebView 内容销毁前保存的状态）
   const [state, setState] = useState<ViewState>(() => {
-    const savedState = vscode.getState();
+    const savedState = vscode.getState() as unknown;
+    const saved =
+      typeof savedState === 'object' && savedState !== null
+        ? (savedState as Record<string, unknown>)
+        : null;
+
     // Migration: if old format detected (has 'content' field), reset to initial
-    if (savedState && 'content' in savedState && !('blocks' in savedState)) {
+    if (saved && 'content' in saved && !('blocks' in saved)) {
       return initialState;
     }
 
     // Migration: older versions without wiki/page
-    if (savedState && !('page' in savedState)) {
-      return { ...initialState, ...savedState } as ViewState;
+    if (saved && !('page' in saved)) {
+      return { ...initialState, ...(saved as Partial<ViewState>) } as ViewState;
     }
 
     return (savedState as ViewState) || initialState;
