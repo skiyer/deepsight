@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { Skeleton } from './components/Skeleton';
@@ -390,20 +390,32 @@ export default function App({ vscode }: AppProps) {
                   const meta = frontMatter ? parseFrontMatter(frontMatter) : {};
                   const hasMeta = Object.keys(meta).length > 0;
                   return (
-                    <div className="h-full overflow-y-auto p-4 flex flex-col gap-3">
+                    <div className="h-full overflow-y-auto p-6 flex flex-col gap-4">
                       {hasMeta ? (
-                        <div className="text-[11px] border border-[var(--vscode-panel-border)] rounded p-3 bg-[var(--vscode-editorWidget-background)] text-[var(--vscode-descriptionForeground)]">
-                          <div className="grid grid-cols-1 gap-y-1">
-                            {Object.entries(meta).map(([k, v]) => (
-                              <div key={k} className="flex gap-2 min-w-0">
-                                <span className="opacity-70 font-medium">{k}</span>
-                                <span className="truncate opacity-90">{v}</span>
-                              </div>
-                            ))}
+                        <details className="text-[12px] border border-[var(--vscode-panel-border)] rounded-md bg-[var(--vscode-editorWidget-background)]/60 text-[var(--vscode-descriptionForeground)] mb-2">
+                          <summary className="cursor-pointer select-none px-4 py-2 font-medium">Metadata</summary>
+                          <div className="px-4 pb-3">
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full border-collapse border border-[var(--vscode-panel-border)] text-[12px]">
+                                <tbody>
+                                  {Object.entries(meta).map(([k, v]) => (
+                                    <tr key={k}>
+                                      <td className="border border-[var(--vscode-panel-border)] px-3 py-2 text-[var(--vscode-foreground)]">
+                                        <span className="opacity-70 font-medium">{k}</span>
+                                        <span className="mx-2 opacity-40">:</span>
+                                        <span className="font-mono opacity-90">{v}</span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
-                        </div>
+                        </details>
                       ) : null}
-                      <MarkdownRenderer content={body} />
+                      <div className="max-w-[900px]">
+                        <MarkdownRenderer content={body} />
+                      </div>
                     </div>
                   );
                 })()

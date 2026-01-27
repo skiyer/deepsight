@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { BookOpen, Search, Shell, FileEdit, Globe, CheckCircle2, Loader2, FileSearch } from 'lucide-react';
 
 interface ToolCallProps {
@@ -6,7 +7,7 @@ interface ToolCallProps {
   info?: string;
 }
 
-const TOOL_ICONS: Record<string, React.ReactNode> = {
+const TOOL_ICONS: Record<string, ReactNode> = {
   Read: <BookOpen className="w-3.5 h-3.5" />,
   Glob: <Search className="w-3.5 h-3.5" />,
   Grep: <FileSearch className="w-3.5 h-3.5" />,

@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check } from 'lucide-react';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark, atomOneLight } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 interface CodeBlockProps {
   language: string;
@@ -62,63 +61,36 @@ function isDarkThemeBackground(): boolean {
 }
 
 export function CodeBlock({ language, code }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false);
   const [isDark] = useState(() => isDarkThemeBackground());
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
   return (
-    <div className="relative rounded-md overflow-hidden my-3 border border-[var(--vscode-panel-border)]">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--vscode-editorWidget-background)] border-b border-[var(--vscode-panel-border)]">
-        {language ? (
-          <span className="text-[11px] text-[var(--vscode-descriptionForeground)] uppercase tracking-wide font-medium">
-            {language}
-          </span>
-        ) : (
-          <span />
-        )}
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-[var(--vscode-descriptionForeground)] rounded transition-colors hover:bg-[var(--vscode-list-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+    <div
+      className="relative rounded-md overflow-hidden my-4 border"
+      style={{
+        borderColor: isDark ? '#3b4048' : '#d0d7de',
+        background: isDark ? '#282c34' : '#fafafa',
+      }}
+    >
+      <div className="overflow-x-auto">
+        <SyntaxHighlighter
+          language={language || undefined}
+          style={isDark ? atomOneDark : atomOneLight}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            padding: '14px 16px',
+            fontSize: '13px',
+            background: 'transparent',
+            fontFamily: 'var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace)',
+            lineHeight: '1.6',
+          }}
+          codeTagProps={{ style: { background: 'transparent' } }}
+          showLineNumbers={false}
+          wrapLongLines={false}
         >
-          {copied ? (
-            <>
-              <Check className="w-3 h-3 text-[#89d185]" />
-              <span className="text-[#89d185]">已复制</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3 h-3" />
-              <span>复制</span>
-            </>
-          )}
-        </button>
+          {code.trim()}
+        </SyntaxHighlighter>
       </div>
-      <SyntaxHighlighter
-        language={language || undefined}
-        style={isDark ? oneDark : oneLight}
-        customStyle={{
-          margin: 0,
-          borderRadius: 0,
-          padding: '12px 14px',
-          fontSize: '12.5px',
-          background: 'var(--vscode-textCodeBlock-background)',
-          color: 'var(--vscode-editor-foreground, var(--vscode-foreground))',
-          fontFamily: 'var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace)',
-          lineHeight: '1.55',
-        }}
-        showLineNumbers={false}
-      >
-        {code.trim()}
-      </SyntaxHighlighter>
     </div>
   );
 }
