@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { analyzeRouter } from "./routes/analyze.js";
+import { wikiRouter } from "./routes/wiki.js";
 
 const app = new Hono();
 
@@ -20,6 +21,9 @@ app.get("/health", (c) => {
 
 // Analyze endpoint
 app.route("/analyze", analyzeRouter);
+
+// Wiki generation endpoint
+app.route("/wiki", wikiRouter);
 
 const port = Number(process.env.DEEPSIGHT_PORT) || 3000;
 
