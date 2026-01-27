@@ -12,8 +12,24 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onLanguage:c", "onLanguage:cpp", "onLanguage:typescript", "onLanguage:javascript", "onLanguage:python", "onLanguage:go", "onLanguage:rust", "onLanguage:java"],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:c",
+    "onLanguage:cpp",
+    "onLanguage:typescript",
+    "onLanguage:javascript",
+    "onLanguage:python",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:java",
+    "onCommand:deepsight.openWiki",
+    "onCommand:deepsight.generateWiki",
+    "onCommand:deepsight.cancelWiki",
+    "onCommand:deepsight.explain",
+    "onCommand:deepsight.audit"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -28,6 +44,14 @@
       {
         "command": "deepsight.openWiki",
         "title": "DeepSight: Open Wiki"
+      },
+      {
+        "command": "deepsight.generateWiki",
+        "title": "DeepSight: Generate Wiki (Full)"
+      },
+      {
+        "command": "deepsight.cancelWiki",
+        "title": "DeepSight: Cancel Wiki Generation"
       }
     ],
     "viewsContainers": {
@@ -51,10 +75,47 @@
     "configuration": {
       "title": "DeepSight",
       "properties": {
-        "deepsight.serverUrl": {
-          "type": "string",
-          "default": "http://localhost:3000",
-          "description": "DeepSight server URL"
+        "deepsight.serverPort": {
+          "type": "number",
+          "default": 3000,
+          "description": "DeepSight localhost server port"
+        },
+        "deepsight.wiki.excludePatterns": {
+          "type": "array",
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/dist/**",
+            "**/build/**"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Wiki generation exclude patterns"
+        },
+        "deepsight.wiki.sensitivePaths": {
+          "type": "array",
+          "default": [
+            ".env",
+            ".env.*",
+            "**/*.pem",
+            "**/*.key",
+            "**/credentials*.json"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Sensitive paths to block during wiki generation"
+        },
+        "deepsight.wiki.maxFilesRead": {
+          "type": "number",
+          "default": 400,
+          "description": "Max files to read during wiki generation"
+        },
+        "deepsight.wiki.maxBytesRead": {
+          "type": "number",
+          "default": 2097152,
+          "description": "Max total bytes to read during wiki generation"
         }
       }
     }
@@ -66,9 +127,13 @@
     "package": "vsce package --allow-missing-repository"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20.0.0",
-    "typescript": "^5.6.0",
-    "@vscode/vsce": "^3.0.0"
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "mermaid": "^11.12.2",
+    "rehype-raw": "^7.0.0"
   }
 }
