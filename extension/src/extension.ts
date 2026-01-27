@@ -7,6 +7,16 @@ let outputChannel: vscode.OutputChannel;
 
 let viewProvider: DeepSightViewProvider;
 let isAnalyzing = false;
+let wikiAbortController: AbortController | null = null;
+
+const DEFAULT_WIKI_PAGES = [
+  "Home.md",
+  "Architecture.md",
+  "Modules.md",
+  "Dataflow.md",
+  "TrustBoundaries.md",
+  "AttackSurface.md",
+];
 
 export function activate(context: vscode.ExtensionContext) {
   // Create output channel for debugging
@@ -60,6 +70,14 @@ export function activate(context: vscode.ExtensionContext) {
     await viewProvider.navigateTo("wiki");
   });
 
+  const generateWikiCommand = vscode.commands.registerCommand("deepsight.generateWiki", async () => {
+    await generateWiki("full");
+  });
+
+  const cancelWikiCommand = vscode.commands.registerCommand("deepsight.cancelWiki", () => {
+    cancelWikiGeneration();
+  });
+
   // Command to show debug output
   const showDebugCommand = vscode.commands.registerCommand(
     "deepsight.showDebug",
@@ -75,9 +93,50 @@ export function activate(context: vscode.ExtensionContext) {
     explainCommand,
     auditCommand,
     openWikiCommand,
+    generateWikiCommand,
+    cancelWikiCommand,
     showDebugCommand,
     outputChannel
   );
+}
+
+function getServerUrl(): string {
+  const config = vscode.workspace.getConfiguration("deepsight");
+  const port = config.get<number>("serverPort", 3000);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid server port: ${port}`);
+  }
+  return `http://localhost:${port}`;
+}
+
+function getWikiScope(): { include: string[]; exclude: string[] } {
+  const config = vscode.workspace.getConfiguration("deepsight");
+  const include = ["server", "extension"];
+  const exclude = config.get<string[]>("wiki.excludePatterns", [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+  ]);
+  return { include, exclude };
+}
+
+function getSensitivePaths(): string[] {
+  const config = vscode.workspace.getConfiguration("deepsight");
+  return config.get<string[]>("wiki.sensitivePaths", [
+    ".env",
+    ".env.*",
+    "**/*.pem",
+    "**/*.key",
+    "**/credentials*.json",
+  ]);
+}
+
+function getWikiLimits(): { maxFilesRead: number; maxBytesRead: number } {
+  const config = vscode.workspace.getConfiguration("deepsight");
+  const maxFilesRead = config.get<number>("wiki.maxFilesRead", 400);
+  const maxBytesRead = config.get<number>("wiki.maxBytesRead", 2 * 1024 * 1024);
+  return { maxFilesRead, maxBytesRead };
 }
 
 async function analyzeCode(
@@ -91,8 +150,7 @@ async function analyzeCode(
   }
   isAnalyzing = true;
 
-  const config = vscode.workspace.getConfiguration("deepsight");
-  const serverUrl = config.get<string>("serverUrl", "http://localhost:3000");
+  const serverUrl = getServerUrl();
 
   const filePath = document.uri.fsPath;
   const fileName = filePath.split(/[/\\]/).pop() || filePath;
@@ -216,6 +274,281 @@ async function analyzeCode(
   } finally {
     isAnalyzing = false;
   }
+}
+
+async function generateWiki(mode: "full" | "current") {
+  if (wikiAbortController) {
+    vscode.window.showInformationMessage("DeepSight: Wiki 正在生成中，请先取消或等待完成。");
+    return;
+  }
+
+  await vscode.commands.executeCommand("deepsight.resultView.focus");
+  await viewProvider.navigateTo("wiki");
+
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  if (!workspaceFolder) {
+    vscode.window.showErrorMessage("DeepSight: No workspace folder found.");
+    return;
+  }
+
+  const cwd = workspaceFolder.uri.fsPath;
+  const serverUrl = getServerUrl();
+  const scope = getWikiScope();
+  const sensitivePaths = getSensitivePaths();
+  const limits = getWikiLimits();
+
+  const requestBody = {
+    cwd,
+    mode,
+    currentPath: "",
+    scope,
+    pages: DEFAULT_WIKI_PAGES,
+    sensitivePaths,
+    limits,
+  };
+
+  outputChannel.appendLine(`\n${"=".repeat(50)}`);
+  outputChannel.appendLine(`[${new Date().toISOString()}] Starting wiki generation`);
+  outputChannel.appendLine(`  Server: ${serverUrl}`);
+  outputChannel.appendLine(`  Mode: ${mode}`);
+  outputChannel.appendLine(`  Scope: include=${JSON.stringify(scope.include)} exclude=${JSON.stringify(scope.exclude)}`);
+  outputChannel.appendLine(`  SensitivePaths: ${JSON.stringify(sensitivePaths)}`);
+  outputChannel.appendLine(`  Limits: ${JSON.stringify(limits)}`);
+
+  const controller = new AbortController();
+  wikiAbortController = controller;
+
+  try {
+    const response = await fetch(`${serverUrl}/wiki/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status} ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("No response body");
+    }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        outputChannel.appendLine(`[Wiki SSE] Event: ${line.slice(6).trim()}`);
+      }
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (!data) continue;
+      try {
+        const msg = JSON.parse(data) as WikiEvent;
+        await handleWikiEvent(msg, {
+          workspaceRoot: workspaceFolder.uri,
+          scope,
+          serverUrl,
+        });
+        } catch (e) {
+          outputChannel.appendLine(`[Wiki SSE] Parse error: ${e}`);
+        }
+      }
+    }
+
+    outputChannel.appendLine(`[Wiki] Done`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    if (message !== "The user aborted a request.") {
+      outputChannel.appendLine(`[Wiki Error] ${message}`);
+      vscode.window.showErrorMessage(`DeepSight: ${message}`);
+    } else {
+      outputChannel.appendLine(`[Wiki] Aborted`);
+    }
+  } finally {
+    wikiAbortController = null;
+  }
+}
+
+function cancelWikiGeneration() {
+  if (!wikiAbortController) {
+    vscode.window.showInformationMessage("DeepSight: 没有正在进行的 Wiki 生成任务。");
+    return;
+  }
+  wikiAbortController.abort();
+  wikiAbortController = null;
+  outputChannel.appendLine(`[Wiki] Cancel requested`);
+}
+
+type WikiEvent =
+  | {
+      type: "progress";
+      phase: "scanning" | "drafting" | "writing";
+      pct: number;
+      message?: string;
+      page?: string;
+    }
+  | {
+      type: "page";
+      path: string;
+      title: string;
+      confidence: "low" | "medium" | "high";
+      markdown: string;
+      blindSpots?: string[];
+    }
+  | { type: "done" }
+  | { type: "error"; code: string; message: string };
+
+async function handleWikiEvent(
+  event: WikiEvent,
+  context: { workspaceRoot: vscode.Uri; scope: { include: string[]; exclude: string[] }; serverUrl: string }
+): Promise<void> {
+  switch (event.type) {
+    case "progress":
+      outputChannel.appendLine(`  [Wiki ${event.phase}] ${event.pct}% ${event.message || ""}`);
+      return;
+    case "page":
+      await writeWikiPage(context.workspaceRoot, event, context);
+      return;
+    case "error":
+      outputChannel.appendLine(`[Wiki Error] ${event.code}: ${event.message}`);
+      vscode.window.showErrorMessage(`DeepSight: ${event.message}`);
+      return;
+    case "done":
+      return;
+  }
+}
+
+async function writeWikiPage(
+  workspaceRoot: vscode.Uri,
+  page: { path: string; title: string; confidence: "low" | "medium" | "high"; markdown: string; blindSpots?: string[] },
+  context: { scope: { include: string[]; exclude: string[] }; serverUrl: string }
+): Promise<void> {
+  const wikiDir = vscode.Uri.joinPath(workspaceRoot, ".deepsight", "wiki");
+  await vscode.workspace.fs.createDirectory(wikiDir);
+
+  const targetPath = page.path.replace(/^\/+/, "");
+  const pageUri = vscode.Uri.joinPath(wikiDir, ...targetPath.split("/"));
+
+  const isHome = targetPath.toLowerCase() === "home.md";
+  if (isHome) {
+    try {
+      await vscode.workspace.fs.stat(pageUri);
+      outputChannel.appendLine(`[Wiki] Skip Home.md (exists)`);
+      return;
+    } catch {
+      // continue
+    }
+  }
+
+  const now = new Date().toISOString();
+  const existing = await readWikiPageSafe(pageUri);
+  const frontMatter = buildFrontMatter({
+    title: page.title,
+    now,
+    existingFrontMatter: existing.frontMatter,
+    confidence: page.confidence,
+    blindSpots: page.blindSpots,
+    scope: context.scope,
+    serverUrl: context.serverUrl,
+  });
+
+  const content = `${frontMatter}\n\n${page.markdown.trim()}\n`;
+  await writeFileAtomically(pageUri, content);
+  outputChannel.appendLine(`[Wiki] Wrote ${targetPath}`);
+}
+
+async function readWikiPageSafe(uri: vscode.Uri): Promise<{ frontMatter: string; body: string }> {
+  try {
+    const bytes = await vscode.workspace.fs.readFile(uri);
+    const text = new TextDecoder().decode(bytes);
+    return splitFrontMatter(text);
+  } catch {
+    return { frontMatter: "", body: "" };
+  }
+}
+
+function splitFrontMatter(markdown: string): { frontMatter: string; body: string } {
+  if (!markdown.startsWith("---")) return { frontMatter: "", body: markdown };
+  const lines = markdown.split("\n");
+  if (lines.length < 3) return { frontMatter: "", body: markdown };
+  if (lines[0].trim() !== "---") return { frontMatter: "", body: markdown };
+  let end = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === "---") {
+      end = i;
+      break;
+    }
+  }
+  if (end === -1) return { frontMatter: "", body: markdown };
+  const frontMatter = lines.slice(1, end).join("\n").trim();
+  const body = lines.slice(end + 1).join("\n").replace(/^\n+/, "");
+  return { frontMatter, body };
+}
+
+function parseFrontMatter(frontMatter: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of frontMatter.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const idx = trimmed.indexOf(":");
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    const value = trimmed.slice(idx + 1).trim();
+    if (key) out[key] = value;
+  }
+  return out;
+}
+
+function buildFrontMatter(params: {
+  title: string;
+  now: string;
+  existingFrontMatter: string;
+  confidence: "low" | "medium" | "high";
+  blindSpots?: string[];
+  scope: { include: string[]; exclude: string[] };
+  serverUrl: string;
+}): string {
+  const existing = parseFrontMatter(params.existingFrontMatter);
+  const created = existing.created || params.now;
+  const model = existing.model || "";
+  const blindSpots = params.blindSpots && params.blindSpots.length
+    ? `[${params.blindSpots.map((v) => `"${v}"`).join(", ")}]`
+    : existing.blindSpots || "[]";
+  const scopeBlock = `scope:\n  include: [${params.scope.include.map((v) => `"${v}"`).join(", ")}]\n  exclude: [${params.scope.exclude.map((v) => `"${v}"`).join(", ")}]`;
+
+  return [
+    "---",
+    `title: ${params.title}`,
+    `created: ${created}`,
+    `updated: ${params.now}`,
+    `generatedBy: deepsight`,
+    `generatedAt: ${params.now}`,
+    `serverUrl: ${params.serverUrl}`,
+    model ? `model: ${model}` : "model: ",
+    scopeBlock,
+    `confidence: ${params.confidence}`,
+    `blindSpots: ${blindSpots}`,
+    "---",
+  ].join("\n");
+}
+
+async function writeFileAtomically(uri: vscode.Uri, content: string): Promise<void> {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(content);
+  const tmpUri = uri.with({ path: `${uri.path}.tmp` });
+  await vscode.workspace.fs.writeFile(tmpUri, bytes);
+  await vscode.workspace.fs.rename(tmpUri, uri, { overwrite: true });
 }
 
 // Track current tool call state
