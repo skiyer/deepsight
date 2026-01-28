@@ -68,6 +68,42 @@ body.vscode-dark {
   background-size: 200% 100%;
 }
 
+/* Progress bar with shimmer animation */
+.progress-bar-animate {
+  /* Base background with VS Code theme color */
+  background-color: var(--vscode-textLink-foreground, #36a6ff);
+
+  /* Shimmer gradient overlay - 高光在右侧 */
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+
+  background-size: 200% 100%;
+
+  /* Smooth width transition */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Shimmer animation - 从左到右 */
+  animation: progressShimmer 2.5s linear infinite;
+
+  /* Rounded corners */
+  border-radius: 9999px;
+}
+
+@keyframes progressShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 /* ============================================================
    VS Code Markdown Rendering
    ============================================================ */

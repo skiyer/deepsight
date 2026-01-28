@@ -152,8 +152,9 @@ export function Header({
           </div>
           <div className="px-4 pb-2">
             <div className="h-1.5 w-full rounded bg-[var(--vscode-panel-border)] overflow-hidden">
+              {/* Progress bar with modern animated effects */}
               <div
-                className="h-full bg-[var(--vscode-textLink-foreground)] transition-[width] duration-200 ease-out animate-pulse-slow"
+                className="progress-bar-animate h-full relative"
                 style={{ width: `${wikiPct}%` }}
               />
             </div>
