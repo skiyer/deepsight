@@ -64,11 +64,11 @@ deepsight/
 
 ```bash
 # Server
-cd server && pnpm install
-pnpm dev                         # Development (tsx watch)
-pnpm start                       # Start server (tsx)
-pnpm build                       # Compile TypeScript
-pnpm start:prod                  # Run compiled code
+pnpm -C server install
+pnpm -C server dev               # Development (tsx watch)
+pnpm -C server start             # Start server (tsx)
+pnpm -C server build             # Compile TypeScript
+pnpm -C server start:prod        # Run compiled code
 
 # Required env vars (see .env.example):
 # - ANTHROPIC_AUTH_TOKEN
@@ -76,11 +76,11 @@ pnpm start:prod                  # Run compiled code
 # - PORT (optional, default: 3000)
 
 # Extension
-cd extension && pnpm install
-cd webview-ui && pnpm install && pnpm build  # Build React UI first
-cd .. && pnpm compile            # Build extension
+pnpm -C extension install
+pnpm -C extension/webview-ui install && pnpm -C extension/webview-ui build  # Build React UI first
+pnpm -C extension compile        # Build extension
 # Press F5 in VS Code to launch Extension Development Host
-pnpm package                     # Package as .vsix
+pnpm -C extension package        # Package as .vsix
 ```
 
 ## Architecture
