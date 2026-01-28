@@ -7,6 +7,49 @@ interface CodeBlockProps {
   code: string;
 }
 
+// Map common Markdown language aliases to highlight.js language ids.
+// Anything unknown should fall back to plain text, otherwise highlight.js will
+// try to auto-detect and produce "random" keyword highlighting.
+const LANGUAGE_ALIASES: Record<string, string> = {
+  // common shorthands
+  js: 'javascript',
+  jsx: 'javascript',
+  ts: 'typescript',
+  tsx: 'typescript',
+  py: 'python',
+  rb: 'ruby',
+  sh: 'bash',
+  zsh: 'bash',
+  yml: 'yaml',
+  md: 'markdown',
+
+  // plaintext
+  plain: 'text',
+  plaintext: 'text',
+  txt: 'text',
+};
+
+const SUPPORTED_LANGUAGES = new Set<string>(
+  ((((SyntaxHighlighter as any).supportedLanguages as string[] | undefined) ?? [])
+    .map((l) => String(l).toLowerCase()))
+);
+
+function normalizeLanguage(input: string): string {
+  const raw = (input || '').trim().toLowerCase();
+  if (!raw) return 'text';
+
+  const mapped = LANGUAGE_ALIASES[raw] ?? raw;
+  if (mapped === 'text') return 'text';
+
+  // If highlight.js doesn't know this language, don't fall back to auto-detect.
+  // Auto-detect is exactly what causes the odd keyword highlighting.
+  if (SUPPORTED_LANGUAGES.size && !SUPPORTED_LANGUAGES.has(mapped)) {
+    return 'text';
+  }
+
+  return mapped;
+}
+
 function parseRgbOrHex(input: string): { r: number; g: number; b: number } | null {
   const raw = input.trim().toLowerCase();
   if (!raw) return null;
@@ -63,6 +106,15 @@ function isDarkThemeBackground(): boolean {
 export function CodeBlock({ language, code }: CodeBlockProps) {
   const [isDark] = useState(() => isDarkThemeBackground());
 
+  // IMPORTANT: When language is empty/unknown, force "text".
+  // Otherwise react-syntax-highlighter/highlight.js will auto-detect the language,
+  // which causes random keyword highlighting for plain code blocks (``` ... ```).
+  const effectiveLanguage = normalizeLanguage(language);
+
+  // Preserve indentation. Only strip the trailing newline that Markdown parsers
+  // commonly include in fenced code blocks.
+  const codeString = code.replace(/\n$/, '');
+
   return (
     <div
       className="relative rounded-md overflow-hidden my-4 border"
@@ -73,7 +125,7 @@ export function CodeBlock({ language, code }: CodeBlockProps) {
     >
       <div className="overflow-x-auto">
         <SyntaxHighlighter
-          language={language || undefined}
+          language={effectiveLanguage}
           style={isDark ? atomOneDark : atomOneLight}
           customStyle={{
             margin: 0,
@@ -81,14 +133,15 @@ export function CodeBlock({ language, code }: CodeBlockProps) {
             padding: '14px 16px',
             fontSize: '13px',
             background: 'transparent',
-            fontFamily: 'var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace)',
+            fontFamily:
+              'var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace)',
             lineHeight: '1.6',
           }}
           codeTagProps={{ style: { background: 'transparent' } }}
           showLineNumbers={false}
           wrapLongLines={false}
         >
-          {code.trim()}
+          {codeString}
         </SyntaxHighlighter>
       </div>
     </div>

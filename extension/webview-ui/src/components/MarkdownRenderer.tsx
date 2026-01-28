@@ -288,7 +288,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     // Code blocks and inline code
     code({ className, children, ...props }) {
       const inPre = useContext(PreContext);
-      const match = /language-(\w+)/.exec(className || '');
+      // `react-markdown` generates className like: "language-ts", "language-c-like", etc.
+      const match = /language-([^\s]+)/.exec(className || '');
       const codeString = String(children).replace(/\n$/, '');
 
       // Block code: inside <pre> or has language class

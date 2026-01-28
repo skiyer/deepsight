@@ -154,10 +154,18 @@ body.vscode-dark {
   margin-top: 0.25em;
 }
 
+/*
+ * Tables
+ *
+ * NOTE: Don't force tables to `display: block`.
+ * Our ReactMarkdown renderer already wraps <table> in an overflow container.
+ * Setting `display: block` makes the browser generate an anonymous inner table.
+ * When the <table> itself has a border, this shows up as a “double border” and
+ * creates a growing blank gap on the right as the webview gets wider.
+ */
 .markdown-body table {
-  display: block;
+  display: table;
   width: 100%;
-  overflow: auto;
 }
 
 .markdown-body th,
