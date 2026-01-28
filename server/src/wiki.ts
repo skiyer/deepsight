@@ -60,6 +60,8 @@ const PAGE_OUTLINES: Record<string, string> = {
   "AttackSurface.md": "入口 / 文件与内容处理 / 网络通信 / 高风险点",
 };
 
+const WIKI_GENERATION_ABORTED = "WIKI_GENERATION_ABORTED";
+
 function normalizePath(input: string): string {
   return input.replace(/\\/g, "/");
 }
@@ -257,7 +259,11 @@ function buildUserPrompt(params: {
   ].join("\n");
 }
 
-async function generateMarkdown(prompt: string, cwd: string): Promise<string> {
+async function generateMarkdown(
+  prompt: string,
+  cwd: string,
+  abortController: AbortController
+): Promise<string> {
   try {
     const q = query({
       prompt,
@@ -269,6 +275,7 @@ async function generateMarkdown(prompt: string, cwd: string): Promise<string> {
         allowDangerouslySkipPermissions: true,
         includePartialMessages: true,
         executable: "node",
+        abortController,
         env: process.env as Record<string, string>,
         stderr: (data: string) => {
           console.error("[SDK stderr]:", data);
@@ -278,6 +285,10 @@ async function generateMarkdown(prompt: string, cwd: string): Promise<string> {
 
     let output = "";
     for await (const msg of q) {
+      if (abortController.signal.aborted) {
+        throw new Error(WIKI_GENERATION_ABORTED);
+      }
+
       if (msg.type === "stream_event" && msg.event?.type === "content_block_delta") {
         const delta = (msg.event as any).delta;
         if (delta?.text) {
@@ -289,103 +300,148 @@ async function generateMarkdown(prompt: string, cwd: string): Promise<string> {
         throw new Error(`Model error: ${msg.subtype}`);
       }
     }
+
+    if (abortController.signal.aborted) {
+      throw new Error(WIKI_GENERATION_ABORTED);
+    }
+
     return output.trim();
   } catch (error) {
+    if (
+      abortController.signal.aborted ||
+      (error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message)))
+    ) {
+      throw new Error(WIKI_GENERATION_ABORTED);
+    }
+
     const err = error as { message?: string; stack?: string; code?: string; stderr?: string };
     const details = [
       err.message || "Unknown error",
       err.code ? `code=${err.code}` : "",
       err.stderr ? `stderr=${err.stderr}` : "",
-    ].filter(Boolean).join(" | ");
+    ]
+      .filter(Boolean)
+      .join(" | ");
     console.error("[wiki] generateMarkdown failed:", err);
     throw new Error(details || "Wiki generation failed");
   }
 }
 
-export async function* generateWikiEvents(params: WikiGenerateParams): AsyncGenerator<WikiEvent> {
-  if (!process.env.ANTHROPIC_AUTH_TOKEN) {
-    yield { type: "error", code: "MISSING_TOKEN", message: "ANTHROPIC_AUTH_TOKEN is not set" };
-    return;
-  }
-  if (!hasClaudeCli()) {
-    yield { type: "error", code: "MISSING_CLAUDE_CLI", message: "Claude CLI not found in PATH" };
-    return;
-  }
+export async function* generateWikiEvents(
+  params: WikiGenerateParams,
+  options?: { abortController?: AbortController }
+): AsyncGenerator<WikiEvent> {
+  const abortController = options?.abortController ?? new AbortController();
 
-  const cwd = params.cwd;
-  const pages = Array.isArray(params.pages) && params.pages.length ? params.pages : DEFAULT_PAGES;
-
-  yield { type: "progress", phase: "scanning", pct: 5, message: "Scanning workspace" };
-
-  const context = await collectQuickContext(params);
-  const safeEvidence = filterSensitiveNotes(context.evidenceNotes, params.sensitivePaths || []);
-  const degrade = context.limitExceeded;
-  const targetPages = degrade
-    ? ["Home.md", "TrustBoundaries.md", "AttackSurface.md"]
-    : pages;
-
-  yield {
-    type: "progress",
-    phase: "drafting",
-    pct: 20,
-    message: degrade ? "Large repo detected, using degraded plan" : "Planning pages",
+  const throwIfAborted = () => {
+    if (abortController.signal.aborted) {
+      throw new Error(WIKI_GENERATION_ABORTED);
+    }
   };
 
-  let manifest = context.manifest;
+  try {
+    if (!process.env.ANTHROPIC_AUTH_TOKEN) {
+      yield { type: "error", code: "MISSING_TOKEN", message: "ANTHROPIC_AUTH_TOKEN is not set" };
+      return;
+    }
+    if (!hasClaudeCli()) {
+      yield { type: "error", code: "MISSING_CLAUDE_CLI", message: "Claude CLI not found in PATH" };
+      return;
+    }
 
-  if (context.homeMissing) {
-    const prompt = buildUserPrompt({
-      page: "Home.md",
-      manifest: context.manifest,
-      outline: PAGE_OUTLINES["Home.md"],
-      evidence: safeEvidence,
-      extraNotes: "Home.md 缺失，请先生成 Manifest。",
-    });
-    const markdown = await generateMarkdown(prompt, cwd);
-    const confidence = extractConfidence(markdown);
-    const blindSpots = extractBlindSpots(markdown);
-    manifest = markdown;
+    throwIfAborted();
+
+    const cwd = params.cwd;
+    const pages = Array.isArray(params.pages) && params.pages.length ? params.pages : DEFAULT_PAGES;
+
+    yield { type: "progress", phase: "scanning", pct: 5, message: "Scanning workspace" };
+
+    const context = await collectQuickContext(params);
+    throwIfAborted();
+
+    const safeEvidence = filterSensitiveNotes(context.evidenceNotes, params.sensitivePaths || []);
+    const degrade = context.limitExceeded;
+    const targetPages = degrade ? ["Home.md", "TrustBoundaries.md", "AttackSurface.md"] : pages;
+
     yield {
-      type: "page",
-      path: "Home.md",
-      title: PAGE_TITLES["Home.md"],
-      confidence,
-      markdown,
-      blindSpots,
+      type: "progress",
+      phase: "drafting",
+      pct: 20,
+      message: degrade ? "Large repo detected, using degraded plan" : "Planning pages",
     };
+
+    let manifest = context.manifest;
+
+    if (context.homeMissing) {
+      throwIfAborted();
+      const prompt = buildUserPrompt({
+        page: "Home.md",
+        manifest: context.manifest,
+        outline: PAGE_OUTLINES["Home.md"],
+        evidence: safeEvidence,
+        extraNotes: "Home.md 缺失，请先生成 Manifest。",
+      });
+      const markdown = await generateMarkdown(prompt, cwd, abortController);
+      throwIfAborted();
+
+      const confidence = extractConfidence(markdown);
+      const blindSpots = extractBlindSpots(markdown);
+      manifest = markdown;
+      yield {
+        type: "page",
+        path: "Home.md",
+        title: PAGE_TITLES["Home.md"],
+        confidence,
+        markdown,
+        blindSpots,
+      };
+    }
+
+    let pct = 35;
+    const perPage = Math.max(1, Math.floor(60 / Math.max(1, targetPages.length)));
+
+    for (const page of targetPages) {
+      if (page === "Home.md") continue;
+      throwIfAborted();
+      yield { type: "progress", phase: "drafting", pct, page, message: `Drafting ${page}` };
+
+      const outline = PAGE_OUTLINES[page] || "";
+      const prompt = buildUserPrompt({
+        page,
+        manifest,
+        outline,
+        evidence: safeEvidence,
+        extraNotes: degrade ? "仓库规模较大，允许低置信度并列出盲区。" : undefined,
+      });
+      const markdown = await generateMarkdown(prompt, cwd, abortController);
+      throwIfAborted();
+
+      const confidence = extractConfidence(markdown);
+      const blindSpots = extractBlindSpots(markdown);
+      yield {
+        type: "page",
+        path: page,
+        title: PAGE_TITLES[page] || page.replace(/\.md$/i, ""),
+        confidence,
+        markdown,
+        blindSpots,
+      };
+      pct = Math.min(90, pct + perPage);
+    }
+
+    throwIfAborted();
+    yield { type: "progress", phase: "writing", pct: 95, message: "Finalizing" };
+    yield { type: "done" };
+  } catch (error) {
+    if (
+      abortController.signal.aborted ||
+      (error instanceof Error && error.message === WIKI_GENERATION_ABORTED)
+    ) {
+      // Client cancelled / stream aborted. Stop silently.
+      return;
+    }
+    throw error;
   }
-
-  let pct = 35;
-  const perPage = Math.max(1, Math.floor(60 / Math.max(1, targetPages.length)));
-
-  for (const page of targetPages) {
-    if (page === "Home.md") continue;
-    yield { type: "progress", phase: "drafting", pct, page, message: `Drafting ${page}` };
-
-    const outline = PAGE_OUTLINES[page] || "";
-    const prompt = buildUserPrompt({
-      page,
-      manifest,
-      outline,
-      evidence: safeEvidence,
-      extraNotes: degrade ? "仓库规模较大，允许低置信度并列出盲区。" : undefined,
-    });
-    const markdown = await generateMarkdown(prompt, cwd);
-    const confidence = extractConfidence(markdown);
-    const blindSpots = extractBlindSpots(markdown);
-    yield {
-      type: "page",
-      path: page,
-      title: PAGE_TITLES[page] || page.replace(/\.md$/i, ""),
-      confidence,
-      markdown,
-      blindSpots,
-    };
-    pct = Math.min(90, pct + perPage);
-  }
-
-  yield { type: "progress", phase: "writing", pct: 95, message: "Finalizing" };
-  yield { type: "done" };
 }
 
 function hasClaudeCli(): boolean {

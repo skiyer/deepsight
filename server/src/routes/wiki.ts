@@ -34,14 +34,32 @@ wikiRouter.post("/generate", async (c) => {
   const params = parsed.data;
 
   return streamSSE(c, async (stream) => {
+    const abortController = new AbortController();
+
+    const abort = () => {
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+    };
+
+    // Abort generation when client disconnects / cancels the SSE stream
+    stream.onAbort(abort);
+
+    // Also attempt to bind to Request abort (runtime dependent)
+    c.req.raw.signal.addEventListener("abort", abort);
+
     try {
-      for await (const evt of generateWikiEvents(params as WikiGenerateParams)) {
+      for await (const evt of generateWikiEvents(params as WikiGenerateParams, { abortController })) {
+        if (abortController.signal.aborted) break;
         await stream.writeSSE({
           event: evt.type,
           data: JSON.stringify(evt),
         });
       }
     } catch (error) {
+      // If client cancelled, stop silently (don't emit error)
+      if (abortController.signal.aborted) return;
+
       await stream.writeSSE({
         event: "error",
         data: JSON.stringify({
@@ -50,6 +68,9 @@ wikiRouter.post("/generate", async (c) => {
           message: error instanceof Error ? error.message : "Unknown error",
         }),
       });
+    } finally {
+      // Ensure underlying SDK query is aborted
+      abort();
     }
   });
 });
