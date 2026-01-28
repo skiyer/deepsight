@@ -442,12 +442,17 @@ async function writeWikiPage(
 
   const isHome = targetPath.toLowerCase() === "home.md";
   if (isHome) {
-    try {
-      await vscode.workspace.fs.stat(pageUri);
-      outputChannel.appendLine(`[Wiki] Skip Home.md (exists)`);
+    // Home.md is sometimes pre-created as a short template on startup.
+    // Only skip overwriting if it looks like a real (user-written) manifest.
+    const existingHome = await readWikiPageSafe(pageUri);
+    const lineCount = existingHome.body
+      .trim()
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean).length;
+    if (lineCount >= 40) {
+      outputChannel.appendLine(`[Wiki] Skip Home.md (looks like a manifest, lines=${lineCount})`);
       return;
-    } catch {
-      // continue
     }
   }
 

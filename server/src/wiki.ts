@@ -167,7 +167,12 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
     const homeContent = await readFileSafe(homePath, state, limits);
     if (homeContent) {
       const { body } = splitFrontMatter(homeContent);
-      if (body.trim().length > 40) {
+      const nonEmptyLineCount = body
+        .trim()
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean).length;
+      if (nonEmptyLineCount >= 40) {
         manifest = body.trim();
         homeMissing = false;
         usedFiles.push(normalizePath(homePath));
