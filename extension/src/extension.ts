@@ -318,6 +318,9 @@ async function generateWiki(mode: "full" | "current") {
   const controller = new AbortController();
   wikiAbortController = controller;
 
+  // Sync generation state to Webview
+  viewProvider.startWikiGeneration(mode);
+
   try {
     const response = await fetch(`${serverUrl}/wiki/generate`, {
       method: "POST",
@@ -369,11 +372,17 @@ async function generateWiki(mode: "full" | "current") {
     outputChannel.appendLine(`[Wiki] Done`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    if (message !== "The user aborted a request.") {
+    // Handle both common abort message variants from different environments
+    const isAbortError = message === "The user aborted a request." ||
+                         message === "This operation was aborted" ||
+                         /aborted/i.test(message);
+    if (!isAbortError) {
       outputChannel.appendLine(`[Wiki Error] ${message}`);
+      viewProvider.setWikiGenerationError(message);
       vscode.window.showErrorMessage(`DeepSight: ${message}`);
     } else {
       outputChannel.appendLine(`[Wiki] Aborted`);
+      viewProvider.setWikiGenerationCanceled("Wiki generation canceled");
     }
   } finally {
     wikiAbortController = null;
@@ -387,6 +396,7 @@ function cancelWikiGeneration() {
   }
   wikiAbortController.abort();
   wikiAbortController = null;
+  viewProvider.setWikiGenerationCanceled("Wiki generation canceled");
   outputChannel.appendLine(`[Wiki] Cancel requested`);
 }
 
@@ -416,15 +426,23 @@ async function handleWikiEvent(
   switch (event.type) {
     case "progress":
       outputChannel.appendLine(`  [Wiki ${event.phase}] ${event.pct}% ${event.message || ""}`);
+      viewProvider.updateWikiGenerationProgress({
+        phase: event.phase,
+        pct: event.pct,
+        message: event.message,
+        page: event.page,
+      });
       return;
     case "page":
       await writeWikiPage(context.workspaceRoot, event, context);
       return;
     case "error":
       outputChannel.appendLine(`[Wiki Error] ${event.code}: ${event.message}`);
+      viewProvider.setWikiGenerationError(event.message);
       vscode.window.showErrorMessage(`DeepSight: ${event.message}`);
       return;
     case "done":
+      viewProvider.setWikiGenerationDone("Wiki generation complete");
       return;
   }
 }

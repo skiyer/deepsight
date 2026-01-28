@@ -43,6 +43,20 @@ interface WikiPageMeta {
   order: number;
 }
 
+type WikiGenerationStatus = "idle" | "running" | "done" | "error" | "canceled";
+
+type WikiGenerationPhase = "scanning" | "drafting" | "writing" | "";
+
+interface WikiGenerationState {
+  status: WikiGenerationStatus;
+  mode: "full" | "current" | "";
+  phase: WikiGenerationPhase;
+  pct: number; // 0-100
+  message: string;
+  page: string;
+  error: string;
+}
+
 interface WikiState {
   status: "idle" | "loading" | "error";
   workspaceRoot: string;
@@ -52,6 +66,8 @@ interface WikiState {
   dirty: boolean;
   error: string;
   lastSavedAt: string;
+
+  generation: WikiGenerationState;
 }
 
 interface ViewState {
@@ -93,6 +109,15 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
       dirty: false,
       error: "",
       lastSavedAt: "",
+      generation: {
+        status: "idle",
+        mode: "",
+        phase: "",
+        pct: 0,
+        message: "",
+        page: "",
+        error: "",
+      },
     },
   };
 
@@ -170,6 +195,15 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
           }
           case "wiki_open_in_editor": {
             await this._openWikiPageInEditor(String(message.path || ""));
+            break;
+          }
+          case "wiki_generate": {
+            // Fire-and-forget: generation can take long; don't block message loop (needed for Cancel)
+            void vscode.commands.executeCommand("deepsight.generateWiki");
+            break;
+          }
+          case "wiki_cancel_generation": {
+            void vscode.commands.executeCommand("deepsight.cancelWiki");
             break;
           }
           default:
@@ -468,6 +502,86 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
     const uri = this._wikiPageUri(root, safePath);
     const doc = await vscode.workspace.openTextDocument(uri);
     await vscode.window.showTextDocument(doc, { preview: false });
+  }
+
+  // Wiki generation state (UI only; actual generation handled in extension.ts)
+  public startWikiGeneration(mode: "full" | "current") {
+    this._state.wiki.generation = {
+      status: "running",
+      mode,
+      phase: "scanning",
+      pct: 0,
+      message: "",
+      page: "",
+      error: "",
+    };
+    this._syncState();
+  }
+
+  public updateWikiGenerationProgress(progress: {
+    phase: "scanning" | "drafting" | "writing";
+    pct: number;
+    message?: string;
+    page?: string;
+  }) {
+    const pct = Math.max(0, Math.min(100, Math.floor(progress.pct)));
+    this._state.wiki.generation = {
+      ...this._state.wiki.generation,
+      status: "running",
+      phase: progress.phase,
+      pct,
+      message: progress.message ?? this._state.wiki.generation.message,
+      page: progress.page ?? this._state.wiki.generation.page,
+      error: "",
+    };
+    this._syncState();
+  }
+
+  public setWikiGenerationDone(message = "Done") {
+    this._state.wiki.generation = {
+      ...this._state.wiki.generation,
+      status: "done",
+      phase: this._state.wiki.generation.phase || "writing",
+      pct: 100,
+      message,
+      page: "",
+      error: "",
+    };
+    this._syncState();
+  }
+
+  public setWikiGenerationCanceled(message = "Canceled") {
+    this._state.wiki.generation = {
+      ...this._state.wiki.generation,
+      status: "canceled",
+      message,
+      page: "",
+      error: "",
+    };
+    this._syncState();
+  }
+
+  public setWikiGenerationError(error: string) {
+    this._state.wiki.generation = {
+      ...this._state.wiki.generation,
+      status: "error",
+      error,
+      message: error,
+    };
+    this._syncState();
+  }
+
+  public clearWikiGeneration() {
+    this._state.wiki.generation = {
+      status: "idle",
+      mode: "",
+      phase: "",
+      pct: 0,
+      message: "",
+      page: "",
+      error: "",
+    };
+    this._syncState();
   }
 
   // Start a new block
