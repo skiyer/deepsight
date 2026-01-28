@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FileEdit } from 'lucide-react';
 import { Header } from './components/Header';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { Skeleton } from './components/Skeleton';
@@ -65,6 +66,20 @@ interface WikiPageMeta {
   order: number;
 }
 
+type WikiGenerationStatus = 'idle' | 'running' | 'done' | 'error' | 'canceled';
+
+type WikiGenerationPhase = 'scanning' | 'drafting' | 'writing' | '';
+
+interface WikiGenerationState {
+  status: WikiGenerationStatus;
+  mode: 'full' | 'current' | '';
+  phase: WikiGenerationPhase;
+  pct: number; // 0-100
+  message: string;
+  page: string;
+  error: string;
+}
+
 interface WikiState {
   status: 'idle' | 'loading' | 'error';
   workspaceRoot: string;
@@ -74,6 +89,8 @@ interface WikiState {
   dirty: boolean;
   error: string;
   lastSavedAt: string;
+
+  generation: WikiGenerationState;
 }
 
 const initialState: ViewState = {
@@ -93,6 +110,15 @@ const initialState: ViewState = {
     dirty: false,
     error: '',
     lastSavedAt: '',
+    generation: {
+      status: 'idle',
+      mode: '',
+      phase: '',
+      pct: 0,
+      message: '',
+      page: '',
+      error: '',
+    },
   },
 };
 
@@ -149,10 +175,26 @@ export default function App({ vscode }: AppProps) {
 
     // Migration: older versions without wiki/page
     if (saved && !('page' in saved)) {
-      return { ...initialState, ...(saved as Partial<ViewState>) } as ViewState;
+      const merged = { ...initialState, ...(saved as Partial<ViewState>) } as ViewState;
+      return merged;
     }
 
-    return (savedState as ViewState) || initialState;
+    const candidate = (savedState as ViewState) || initialState;
+
+    // Migration: older versions without wiki.generation
+    const wikiAny = (candidate as any).wiki as Partial<WikiState> | undefined;
+    if (!wikiAny || !(wikiAny as any).generation) {
+      return {
+        ...candidate,
+        wiki: {
+          ...initialState.wiki,
+          ...(wikiAny || {}),
+          generation: initialState.wiki.generation,
+        },
+      } as ViewState;
+    }
+
+    return candidate;
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -167,6 +209,30 @@ export default function App({ vscode }: AppProps) {
       return 260;
     }
   });
+
+  // Dismissible toast states for wiki page
+  const [dismissedCanceled, setDismissedCanceled] = useState(false);
+  const [dismissedError, setDismissedError] = useState(false);
+
+  // Auto-reset dismissed states when status changes
+  useEffect(() => {
+    if (state.wiki.generation.status !== 'canceled') {
+      setDismissedCanceled(false);
+    }
+    if (state.wiki.generation.status !== 'error') {
+      setDismissedError(false);
+    }
+  }, [state.wiki.generation.status]);
+
+  // Auto-dismiss error toast after 5 seconds
+  useEffect(() => {
+    if (state.wiki.generation.status === 'error' && !dismissedError) {
+      const timer = setTimeout(() => {
+        setDismissedError(true);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.wiki.generation.status, dismissedError]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -261,9 +327,6 @@ export default function App({ vscode }: AppProps) {
     return out;
   };
 
-  const currentWikiMeta = state.wiki.pages.find((p) => p.path === state.wiki.currentPath);
-  const currentWikiTitle = currentWikiMeta?.title || state.wiki.currentPath || 'Wiki';
-
   const navigate = (page: PageMode) => {
     vscode.postMessage({ type: 'navigate', page });
   };
@@ -272,12 +335,20 @@ export default function App({ vscode }: AppProps) {
     vscode.postMessage({ type: 'wiki_open', path });
   };
 
-  const refreshWiki = () => {
-    vscode.postMessage({ type: 'wiki_list' });
-    if (state.wiki.currentPath) {
-      vscode.postMessage({ type: 'wiki_open', path: state.wiki.currentPath });
-    }
+  const openWikiInEditor = () => {
+    if (!state.wiki.currentPath) return;
+    vscode.postMessage({ type: 'wiki_open_in_editor', path: state.wiki.currentPath });
   };
+
+  const generateWiki = () => {
+    vscode.postMessage({ type: 'wiki_generate' });
+  };
+
+  const cancelWikiGeneration = () => {
+    vscode.postMessage({ type: 'wiki_cancel_generation' });
+  };
+
+  const wikiGen = state.wiki.generation;
 
   const isLoading = state.status === 'loading';
   const hasBlocks = state.blocks.length > 0;
@@ -320,7 +391,9 @@ export default function App({ vscode }: AppProps) {
         onNavigate={navigate}
         anchor={state.anchor}
         mode={state.mode}
-        wikiTitle={currentWikiTitle}
+        wikiGeneration={state.wiki.generation}
+        onWikiGenerateAll={generateWiki}
+        onWikiCancelGeneration={cancelWikiGeneration}
       />
 
       {state.page === 'wiki' ? (
@@ -330,21 +403,6 @@ export default function App({ vscode }: AppProps) {
             className="border-r border-[var(--vscode-panel-border)] bg-[var(--vscode-sideBar-background)] flex flex-col"
             style={{ width: `${wikiSidebarWidth}px` }}
           >
-            <div className="p-3 flex flex-col gap-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={refreshWiki}
-                  className="w-full px-2 py-1.5 text-xs rounded border border-[var(--vscode-panel-border)]"
-                  title="Refresh"
-                >
-                  Refresh
-                </button>
-              </div>
-              {state.wiki.status === 'error' && state.wiki.error ? (
-                <div className="text-xs text-[var(--vscode-errorForeground)] break-words">{state.wiki.error}</div>
-              ) : null}
-            </div>
-
             <div className="flex-1 overflow-y-auto">
               {(state.wiki.pages || []).map((p) => {
                   const active = p.path === state.wiki.currentPath;
@@ -383,38 +441,80 @@ export default function App({ vscode }: AppProps) {
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="flex-1 min-h-0 overflow-hidden">
               {!state.wiki.currentPath ? (
-                <div className="p-6 text-sm opacity-70">Select a wiki page from the left.</div>
+                <div className="h-full overflow-y-auto">
+                  {/* Page load error */}
+                  {state.wiki.status === 'error' && state.wiki.error && (
+                    <div className="m-6 px-3 py-2 rounded bg-[var(--vscode-inputValidation-errorBackground)] text-[var(--vscode-inputValidation-errorForeground)] text-xs">
+                      {state.wiki.error}
+                    </div>
+                  )}
+                  <div className="p-6 text-sm opacity-70">Select a wiki page from the left.</div>
+                </div>
               ) : (
                 (() => {
                   const { frontMatter, body } = splitFrontMatter(state.wiki.content || '');
                   const meta = frontMatter ? parseFrontMatter(frontMatter) : {};
                   const hasMeta = Object.keys(meta).length > 0;
                   return (
-                    <div className="h-full overflow-y-auto p-6 flex flex-col gap-4">
-                      {hasMeta ? (
-                        <details className="text-[12px] border border-[var(--vscode-panel-border)] rounded-md bg-[var(--vscode-editorWidget-background)]/60 text-[var(--vscode-descriptionForeground)] mb-2">
-                          <summary className="cursor-pointer select-none px-4 py-2 font-medium">Metadata</summary>
-                          <div className="px-4 pb-3">
-                            <div className="overflow-x-auto">
-                              <table className="min-w-full border-collapse border border-[var(--vscode-panel-border)] text-[12px]">
-                                <tbody>
-                                  {Object.entries(meta).map(([k, v]) => (
-                                    <tr key={k}>
-                                      <td className="border border-[var(--vscode-panel-border)] px-3 py-2 text-[var(--vscode-foreground)]">
-                                        <span className="opacity-70 font-medium">{k}</span>
-                                        <span className="mx-2 opacity-40">:</span>
-                                        <span className="font-mono opacity-90">{v}</span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                    <div className="h-full overflow-y-auto">
+                      {/* Error toast */}
+                      {wikiGen.status === 'error' && wikiGen.error && !dismissedError && (
+                        <div className="mx-6 mt-4 px-3 py-2 rounded bg-[var(--vscode-inputValidation-errorBackground)] text-[var(--vscode-inputValidation-errorForeground)] text-xs flex items-center justify-between gap-3">
+                          <span className="truncate" title={wikiGen.error}>{wikiGen.error}</span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button onClick={generateWiki} className="hover:underline">Retry</button>
+                            <button onClick={() => setDismissedError(true)} className="opacity-60 hover:opacity-100">×</button>
                           </div>
-                        </details>
-                      ) : null}
-                      <div className="max-w-[900px]">
-                        <MarkdownRenderer content={body} />
+                        </div>
+                      )}
+
+                      {/* Canceled toast */}
+                      {wikiGen.status === 'canceled' && !dismissedCanceled && (
+                        <div className="mx-6 mt-4 px-3 py-2 rounded bg-[var(--vscode-inputValidation-warningBackground)] text-[var(--vscode-inputValidation-warningForeground)] text-xs flex items-center justify-between gap-3">
+                          <span>Canceled</span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button onClick={generateWiki} className="hover:underline">Retry</button>
+                            <button onClick={() => setDismissedCanceled(true)} className="opacity-60 hover:opacity-100">×</button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="px-6 py-4 flex flex-col gap-3">
+                        {/* Metadata and Edit button row */}
+                        <div className="flex items-center justify-between">
+                          {hasMeta ? (
+                            <details className="text-[11px] text-[var(--vscode-descriptionForeground)]">
+                              <summary className="cursor-pointer select-none inline-flex items-center gap-2 hover:text-[var(--vscode-foreground)] transition-colors">
+                                <span className="opacity-60">Metadata</span>
+                                <span className="opacity-40">·</span>
+                                <span className="opacity-60">{Object.keys(meta).length} fields</span>
+                              </summary>
+                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                                {Object.entries(meta).map(([k, v]) => (
+                                  <span key={k} className="inline-flex items-center gap-1">
+                                    <span className="opacity-50">{k}:</span>
+                                    <span className="font-mono opacity-80">{v}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </details>
+                          ) : <div />}
+
+                          {/* Edit button - aligned with metadata */}
+                          <button
+                            onClick={openWikiInEditor}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)]/60 text-[var(--vscode-foreground)] opacity-60 hover:opacity-100 transition-opacity"
+                            title="Open in Editor"
+                            aria-label="Open in Editor"
+                          >
+                            <FileEdit className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                        </div>
+
+                        <div className="max-w-[900px]">
+                          <MarkdownRenderer content={body} />
+                        </div>
                       </div>
                     </div>
                   );
