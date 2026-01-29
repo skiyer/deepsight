@@ -1,9 +1,6 @@
 import * as vscode from "vscode";
 
 export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
-  private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
-  public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
-
   public async provideCodeLenses(
     document: vscode.TextDocument,
     token: vscode.CancellationToken
