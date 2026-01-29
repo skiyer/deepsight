@@ -1,7 +1,7 @@
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { execSync } from "child_process";
 import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
-import { ALLOWED_TOOLS } from "./tools.js";
+import { createSdkQuery } from "./sdk.js";
 
 export interface AnalyzeParams {
   file: string;
@@ -123,21 +123,10 @@ ${params.mode === "explain" ? "请解释这段代码的功能和数据流。" : 
   });
 
   try {
-    const q = query({
+    const q = createSdkQuery({
       prompt: userPrompt,
-      options: {
-        cwd,
-        systemPrompt,
-        allowedTools: ALLOWED_TOOLS,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        includePartialMessages: true,
-        executable: "node",
-        env: process.env as Record<string, string>,
-        stderr: (data: string) => {
-          console.error("[SDK stderr]:", data);
-        },
-      },
+      cwd,
+      systemPrompt,
     });
 
     console.log("[analyze] Query created, starting iteration...");

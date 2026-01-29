@@ -1,9 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { WIKI_PROMPT } from "./prompts.js";
-import { ALLOWED_TOOLS } from "./tools.js";
+import { createSdkQuery } from "./sdk.js";
 
 export type WikiEvent =
   | {
@@ -73,14 +72,13 @@ function patternToRegex(pattern: string): RegExp {
   return new RegExp(`^${withStars}$`);
 }
 
-function matchesPattern(targetPath: string, pattern: string): boolean {
-  const normalized = normalizePath(targetPath);
+function matchesPattern(normalizedPath: string, pattern: string): boolean {
   const regex = patternToRegex(pattern);
-  if (regex.test(normalized)) return true;
-  if (!normalized.startsWith("/")) {
-    return regex.test(`/${normalized}`);
-  }
-  return false;
+  if (regex.test(normalizedPath)) return true;
+  const withLeadingSlash = normalizedPath.startsWith("/")
+    ? normalizedPath
+    : `/${normalizedPath}`;
+  return regex.test(withLeadingSlash);
 }
 
 function isExcludedPath(targetPath: string, excludePatterns: string[]): boolean {
@@ -151,7 +149,7 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
   usedFiles: string[];
 }> {
   const cwd = params.cwd;
-  const exclude = params.scope?.exclude || [];
+  const exclude = params.scope.exclude;
   const sensitivePaths = params.sensitivePaths || [];
   const limits = {
     maxFilesRead: params.limits?.maxFilesRead ?? 400,
@@ -203,9 +201,8 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
 
   for (const relPath of candidateFiles) {
     const fullPath = path.join(cwd, relPath);
-    const normalized = normalizePath(fullPath);
-    if (isExcludedPath(normalized, exclude)) continue;
-    if (isSensitivePath(normalized, sensitivePaths)) continue;
+    if (isExcludedPath(fullPath, exclude)) continue;
+    if (isSensitivePath(fullPath, sensitivePaths)) continue;
     try {
       const content = await readFileSafe(fullPath, state, limits);
       if (!content) continue;
@@ -231,7 +228,7 @@ function filterSensitiveNotes(notes: string, sensitivePaths: string[]): string {
   const filtered = lines.filter((line) => {
     if (!line.startsWith("File:")) return true;
     const filePath = line.slice(5).trim();
-    return !isSensitivePath(normalizePath(filePath), sensitivePaths);
+    return !isSensitivePath(filePath, sensitivePaths);
   });
   return filtered.join("\n");
 }
@@ -266,22 +263,11 @@ async function generateMarkdown(
   abortController: AbortController
 ): Promise<string> {
   try {
-    const q = query({
+    const q = createSdkQuery({
       prompt,
-      options: {
-        cwd,
-        systemPrompt: WIKI_PROMPT,
-        allowedTools: ALLOWED_TOOLS,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        includePartialMessages: true,
-        executable: "node",
-        abortController,
-        env: process.env as Record<string, string>,
-        stderr: (data: string) => {
-          console.error("[SDK stderr]:", data);
-        },
-      },
+      cwd,
+      systemPrompt: WIKI_PROMPT,
+      abortController,
     });
 
     let output = "";
