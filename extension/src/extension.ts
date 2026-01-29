@@ -672,16 +672,19 @@ function getToolDisplayInfo(toolName: string, input: any): string {
       return input.file_path ? `${input.file_path.split(/[/\\]/).pop()}` : "";
     case "Glob":
       return input.pattern ? `${input.pattern}` : "";
-    case "Grep":
-      return input.pattern ? `"${input.pattern}"` : "";
-    case "Bash":
-      return input.command ? `${input.command.substring(0, 40)}${input.command.length > 40 ? "..." : ""}` : "";
-    case "Write":
-      return input.file_path ? `${input.file_path.split(/[/\\]/).pop()}` : "";
-    case "Edit":
-      return input.file_path ? `${input.file_path.split(/[/\\]/).pop()}` : "";
-    default:
-      return "";
+    default: {
+      let summary = "";
+      if (input === undefined || input === null) {
+        summary = "";
+      } else if (typeof input === "string") {
+        summary = input;
+      } else if (typeof input === "object") {
+        summary = JSON.stringify(input);
+      } else {
+        summary = String(input);
+      }
+      return summary || "—";
+    }
   }
 }
 

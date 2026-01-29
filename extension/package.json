@@ -47,7 +47,7 @@
       },
       {
         "command": "deepsight.generateWiki",
-        "title": "DeepSight: Generate Wiki (Full)"
+        "title": "DeepSight: Generate Wiki"
       },
       {
         "command": "deepsight.cancelWiki",
