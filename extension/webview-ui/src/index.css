@@ -414,15 +414,12 @@ body.vscode-dark {
 }
 
 /* Links */
-.markdown-body a:hover {
-  text-decoration: underline;
-}
-
 .markdown-body a {
   color: var(--md-link, #4078f2);
 }
 
 .markdown-body a:hover {
+  text-decoration: underline;
   color: var(--md-link-hover, #4078f2);
 }
 
