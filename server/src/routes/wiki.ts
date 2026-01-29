@@ -32,11 +32,19 @@ wikiRouter.post("/generate", async (c) => {
 
   return streamSSE(c, async (stream) => {
     const abortController = new AbortController();
+    const { signal } = abortController;
 
     const abort = () => {
-      if (!abortController.signal.aborted) {
+      if (!signal.aborted) {
         abortController.abort();
       }
+    };
+
+    const sendEvent = (event: { type: string }) => {
+      return stream.writeSSE({
+        event: event.type,
+        data: JSON.stringify(event),
+      });
     };
 
     // Abort generation when client disconnects / cancels the SSE stream
@@ -47,15 +55,12 @@ wikiRouter.post("/generate", async (c) => {
 
     try {
       for await (const evt of generateWikiEvents(params, { abortController })) {
-        if (abortController.signal.aborted) break;
-        await stream.writeSSE({
-          event: evt.type,
-          data: JSON.stringify(evt),
-        });
+        if (signal.aborted) break;
+        await sendEvent(evt);
       }
     } catch (error) {
       // If client cancelled, stop silently (don't emit error)
-      if (abortController.signal.aborted) return;
+      if (signal.aborted) return;
 
       await stream.writeSSE({
         event: "error",
