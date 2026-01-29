@@ -87,7 +87,8 @@ MVP 行为：
 
 - Webview 内编辑（避免与 VS Code 原生编辑器重复）
 - Pages 搜索/过滤（固定页模式下先不做）
-- Mermaid/Graphviz 运行时渲染（当前仅以代码块承载图源码）
+- Mermaid 代码块渲染（已支持：在 Markdown 中使用 `mermaid` fenced code block）
+- Graphviz 等其它图渲染（仍仅以代码块承载源码）
 - 图片/附件渲染（受 CSP 限制，后续需要设计本地资源加载策略）
 
 ## 开发与构建

@@ -359,6 +359,40 @@ body.vscode-dark {
   color: inherit;
 }
 
+/* Mermaid diagrams (```mermaid) - Modern Style */
+.mermaid-block {
+  margin: 16px 0;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.mermaid-block:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.mermaid-block .mermaid-diagram {
+  display: inline-block;
+}
+
+.mermaid-block svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Improve mermaid text rendering */
+.mermaid-block text {
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+}
+
+/* Smooth transitions for interactive elements */
+.mermaid-block .node rect,
+.mermaid-block .node circle,
+.mermaid-block .node ellipse,
+.mermaid-block .node polygon {
+  transition: all 0.2s ease;
+}
+
 .markdown-body blockquote {
   border-left: 0.25em solid var(--md-quote, #d0d7de);
   color: var(--md-muted, #6a737d);

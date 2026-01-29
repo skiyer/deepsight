@@ -14,6 +14,7 @@
 - 自动更新：Extension 使用 `createFileSystemWatcher` 监听 `.deepsight/wiki/**`，保存/变更后自动刷新 pages 与当前页内容（带 200ms debounce）。
 - UI 细节：Wiki 左侧页面栏支持拖动调节宽度，并存储在 `localStorage`。
 - 命令入口：新增 `DeepSight: Open Wiki`（`deepsight.openWiki`）。
+- Mermaid 支持：Webview 可渲染 `mermaid` fenced code block（输出为 SVG 图）。
 
 ## 当前行为（What it does now）
 
@@ -26,7 +27,6 @@
 ### 高优先级
 
 - 证据链接/跳转：支持从 Wiki 正文点击“代码证据”跳转到文件/符号/行号（建议走 Webview->Extension 消息，再由 Extension 调 VS Code API 打开定位）。
-- Mermaid 支持：在 Webview 中渲染 `mermaid` 代码块（需评估 CSP 与打包体积）。
 - 图片/附件策略：允许本地 `assets/` 引用并通过 `asWebviewUri` 安全展示，同时扩展 CSP 的 `img-src`。
 
 ### 中优先级

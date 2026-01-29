@@ -331,7 +331,7 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
           `# ${meta.title}\n\n` +
           `## 目标\n- 用一句话描述系统做什么\n- 明确核心边界/依赖（进程、服务、库、硬件等）\n\n` +
           `## 组件分解\n- 组件/子系统列表\n- 关键接口\n\n` +
-          `## 架构图（可选）\n\n\`\`\`\n(这里可放 Mermaid/Graphviz 源码，MVP 先以代码块展示)\n\`\`\`\n`
+          `## 架构图（可选）\n\n\`\`\`mermaid\n%% 在这里放 Mermaid 图（例如：graph TD）\ngraph TD\n  A[Component A] --> B[Component B]\n\`\`\`\n`
         );
       case "modules":
         return (
@@ -339,6 +339,7 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
           `# ${meta.title}\n\n` +
           `按模块列出：职责、入口点、关键 API、依赖、常见风险。\n\n` +
           `## 模块清单\n- [ ] 模块 A\n- [ ] 模块 B\n\n` +
+          `## 模块间依赖关系（mermaid）\n\n\`\`\`mermaid\n%% 在这里放 Mermaid 图（例如：flowchart LR）\nflowchart LR\n  A[Module A] --> B[Module B]\n\`\`\`\n\n` +
           `## 模块模板\n- **职责**：\n- **入口**：\n- **关键数据**：\n- **信任假设**：\n- **高风险点**：\n- **代码证据**：\n`
         );
       case "dataflow":
@@ -347,13 +348,14 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
           `# ${meta.title}\n\n` +
           `聚焦“可控输入 -> 关键处理 -> 敏感 sink”的端到端路径。\n\n` +
           `## 关键数据对象\n- 认证令牌\n- 配置/策略\n- IPC 消息\n\n` +
-          `## 数据流图\n\n\`\`\`\n(建议按子系统拆分，MVP 先以源码块记录)\n\`\`\`\n`
+          `## 数据流图\n\n\`\`\`mermaid\n%% 在这里放 Mermaid 图（例如：flowchart TD）\nflowchart TD\n  A[Source] --> B[Transform] --> C[Sink]\n\`\`\`\n`
         );
       case "trust-boundaries":
         return (
           header +
           `# ${meta.title}\n\n` +
           `列出边界类型、穿越点、校验逻辑与可利用假设。\n\n` +
+          `## 信任边界图（mermaid）\n\n\`\`\`mermaid\n%% 在这里放 Mermaid 图（例如：flowchart TD）\nflowchart TD\n  A[Untrusted] -->|Boundary| B[Trusted]\n\`\`\`\n\n` +
           `## 边界清单\n- 进程边界\n- 权限边界\n- 网络边界\n- 用户态/内核态\n\n` +
           `## 穿越点模板\n- **边界**：\n- **入口**：\n- **校验/鉴权**：\n- **失败模式**：\n- **代码证据**：\n`
         );

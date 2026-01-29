@@ -2,6 +2,7 @@ import React, { createContext, useContext } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CodeBlock } from './CodeBlock';
+import { MermaidBlock } from './MermaidBlock';
 import type { Components } from 'react-markdown';
 
 interface MarkdownRendererProps {
@@ -294,7 +295,14 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
       // Block code: inside <pre> or has language class
       if (inPre || match) {
-        return <CodeBlock language={match?.[1] || ''} code={codeString} />;
+        const language = (match?.[1] || '').trim().toLowerCase();
+
+        // Mermaid diagram: render as SVG instead of a plain code block.
+        if (language === 'mermaid') {
+          return <MermaidBlock code={codeString} />;
+        }
+
+        return <CodeBlock language={language} code={codeString} />;
       }
 
       // Inline code
