@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { execSync } from "node:child_process";
 import { WIKI_PROMPT } from "./prompts.js";
 import { createAgentQuery } from "./llm/client.js";
+import { hasClaudeCli } from "./runtime/diagnostics.js";
 
 export type WikiEvent =
   | {
@@ -431,11 +431,3 @@ export async function* generateWikiEvents(
   }
 }
 
-function hasClaudeCli(): boolean {
-  try {
-    execSync("which claude", { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}

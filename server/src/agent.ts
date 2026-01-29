@@ -1,7 +1,7 @@
-import { execSync } from "child_process";
 import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
 import { createAgentQuery } from "./llm/client.js";
 import type { AgentMessage } from "./llm/types.js";
+import { resolveWorkspacePaths } from "./runtime/paths.js";
 
 export interface AnalyzeParams {
   file: string;
@@ -10,10 +10,6 @@ export interface AnalyzeParams {
   mode: "explain" | "audit";
   cwd: string;
 }
-
-// Check if running in WSL
-const isWSL = process.platform === "linux" &&
-  process.env.WSL_DISTRO_NAME !== undefined;
 
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === "true";
 
@@ -26,54 +22,6 @@ const MODE_INSTRUCTIONS = {
   explain: "请解释这段代码的功能和数据流。",
   audit: "请对这段代码进行安全审计。",
 } as const;
-
-/**
- * Convert Windows path to WSL path
- * e.g., "d:\MyWorks\project" -> "/mnt/d/MyWorks/project"
- */
-function toWSLPath(windowsPath: string): string {
-  // Check if it's a Windows path (contains backslash or drive letter)
-  if (/^[a-zA-Z]:/.test(windowsPath)) {
-    const driveLetter = windowsPath[0].toLowerCase();
-    const rest = windowsPath.slice(2).replace(/\\/g, "/");
-    return `/mnt/${driveLetter}${rest}`;
-  }
-  // Already a Unix path or relative path
-  return windowsPath.replace(/\\/g, "/");
-}
-
-// Debug: Log environment info on startup
-function logEnvironmentInfo() {
-  console.log("=== DeepSight Agent Environment Debug ===");
-  console.log("Platform:", process.platform);
-  console.log("Is WSL:", isWSL);
-  console.log("WSL_DISTRO_NAME:", process.env.WSL_DISTRO_NAME);
-  console.log("NODE_ENV:", process.env.NODE_ENV);
-  console.log("ANTHROPIC_AUTH_TOKEN:", process.env.ANTHROPIC_AUTH_TOKEN ? "***set***" : "NOT SET");
-  console.log("ANTHROPIC_BASE_URL:", process.env.ANTHROPIC_BASE_URL || "NOT SET");
-  console.log("DEBUG_PROMPT:", process.env.DEBUG_PROMPT === "true" ? "ENABLED" : "disabled");
-
-  try {
-    const nodeVersion = execSync("node --version", { encoding: "utf-8" }).trim();
-    const nodePath = execSync("which node", { encoding: "utf-8" }).trim();
-    console.log("Node version:", nodeVersion);
-    console.log("Node path:", nodePath);
-  } catch (e) {
-    console.error("Failed to get node info:", e);
-  }
-
-  try {
-    const claudePath = execSync("which claude", { encoding: "utf-8" }).trim();
-    console.log("Claude CLI path:", claudePath);
-  } catch (e) {
-    console.log("Claude CLI not found in PATH");
-  }
-
-  console.log("=========================================");
-}
-
-// Log on module load
-logEnvironmentInfo();
 
 function buildUserPrompt(params: {
   file: string;
@@ -92,12 +40,10 @@ ${MODE_INSTRUCTIONS[params.mode]}`;
 
 export async function* analyze(params: AnalyzeParams): AsyncGenerator<AgentMessage> {
   // Convert paths if running in WSL
-  let cwd = params.cwd;
-  let file = params.file;
+  const resolvedPaths = resolveWorkspacePaths({ cwd: params.cwd, file: params.file });
+  const { cwd, file } = resolvedPaths;
 
-  if (isWSL) {
-    cwd = toWSLPath(params.cwd);
-    file = toWSLPath(params.file);
+  if (resolvedPaths.converted) {
     console.log("[analyze] WSL path conversion:");
     console.log("  cwd:", params.cwd, "->", cwd);
     console.log("  file:", params.file, "->", file);
