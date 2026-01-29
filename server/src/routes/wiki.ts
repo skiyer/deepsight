@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
-import { generateWikiEvents, type WikiGenerateParams } from "../wiki.js";
+import { generateWikiEvents } from "../wiki.js";
+import { parseJson } from "./validate.js";
 
 const wikiRouter = new Hono();
 
@@ -22,11 +23,9 @@ const WikiGenerateRequestSchema = z.object({
 });
 
 wikiRouter.post("/generate", async (c) => {
-  const body = await c.req.json();
-  const parsed = WikiGenerateRequestSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return c.json({ error: "Invalid request", details: parsed.error.errors }, 400);
+  const parsed = await parseJson(c, WikiGenerateRequestSchema);
+  if (!parsed.ok) {
+    return parsed.response;
   }
 
   const params = parsed.data;
@@ -47,7 +46,7 @@ wikiRouter.post("/generate", async (c) => {
     c.req.raw.signal.addEventListener("abort", abort);
 
     try {
-      for await (const evt of generateWikiEvents(params as WikiGenerateParams, { abortController })) {
+      for await (const evt of generateWikiEvents(params, { abortController })) {
         if (abortController.signal.aborted) break;
         await stream.writeSSE({
           event: evt.type,

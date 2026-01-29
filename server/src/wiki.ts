@@ -31,8 +31,24 @@ export interface WikiGenerateParams {
   limits?: { maxFilesRead?: number; maxBytesRead?: number };
 }
 
+const HOME_PAGE = "Home.md";
+const DEGRADED_PAGES = [HOME_PAGE, "TrustBoundaries.md", "AttackSurface.md"];
+const ROOT_ENTRY_LIMIT = 60;
+const QUICK_CONTEXT_PREVIEW_LINES = 40;
+const QUICK_CONTEXT_FILES = [
+  "README.md",
+  "README.MD",
+  "README.txt",
+  "package.json",
+  "server/package.json",
+  "extension/package.json",
+  "server/src/index.ts",
+  "extension/src/extension.ts",
+  "extension/src/webview.ts",
+];
+
 const PAGE_DEFINITIONS: Record<string, { title: string; outline: string }> = {
-  "Home.md": {
+  [HOME_PAGE]: {
     title: "主页",
     outline: "Summary / Tech Stack / Entrypoints / Core Modules / Security Focus",
   },
@@ -174,7 +190,7 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
   const state = { filesRead: 0, bytesRead: 0, limitExceeded: false };
   const snippets: string[] = [];
 
-  const homePath = path.join(cwd, ".deepsight", "wiki", "Home.md");
+  const homePath = path.join(cwd, ".deepsight", "wiki", HOME_PAGE);
   let homeMissing = true;
   let manifest = "";
 
@@ -197,29 +213,17 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
   }
 
   const rootEntries = await fs.readdir(cwd, { withFileTypes: true });
-  const topLevel = rootEntries.map((entry) => entry.name).slice(0, 60);
+  const topLevel = rootEntries.map((entry) => entry.name).slice(0, ROOT_ENTRY_LIMIT);
   snippets.push(`Workspace entries: ${topLevel.join(", ")}`);
 
-  const candidateFiles = [
-    "README.md",
-    "README.MD",
-    "README.txt",
-    "package.json",
-    "server/package.json",
-    "extension/package.json",
-    "server/src/index.ts",
-    "extension/src/extension.ts",
-    "extension/src/webview.ts",
-  ];
-
-  for (const relPath of candidateFiles) {
+  for (const relPath of QUICK_CONTEXT_FILES) {
     const fullPath = path.join(cwd, relPath);
     if (isExcludedPath(fullPath, exclude)) continue;
     if (isSensitivePath(fullPath, sensitivePaths)) continue;
     try {
       const content = await readFileSafe(fullPath, state, limits);
       if (!content) continue;
-      const preview = content.split("\n").slice(0, 40).join("\n");
+      const preview = content.split("\n").slice(0, QUICK_CONTEXT_PREVIEW_LINES).join("\n");
       snippets.push(`File: ${relPath}\n${preview}`);
     } catch {
       // ignore
@@ -227,7 +231,7 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
   }
 
   if (!manifest) {
-    manifest = `该项目用于安全审计的系统 Wiki。当前未提供 Home.md。\n\n${snippets.join("\n\n")}`;
+    manifest = `该项目用于安全审计的系统 Wiki。当前未提供 ${HOME_PAGE}。\n\n${snippets.join("\n\n")}`;
   }
 
   const evidenceNotes = snippets.join("\n\n");
@@ -255,7 +259,7 @@ function buildUserPrompt(params: {
   return [
     `你正在生成页面：${params.page}`,
     "",
-    "## Manifest (Home.md)",
+    `## Manifest (${HOME_PAGE})`,
     params.manifest,
     "",
     "## Page Outline",
@@ -347,7 +351,7 @@ export async function* generateWikiEvents(
 
     const safeEvidence = filterSensitiveNotes(context.evidenceNotes, params.sensitivePaths || []);
     const degrade = context.limitExceeded;
-    const targetPages = degrade ? ["Home.md", "TrustBoundaries.md", "AttackSurface.md"] : pages;
+    const targetPages = degrade ? DEGRADED_PAGES : pages;
 
     yield {
       type: "progress",
@@ -361,11 +365,11 @@ export async function* generateWikiEvents(
     if (context.homeMissing) {
       throwIfAborted(abortController);
       const prompt = buildUserPrompt({
-        page: "Home.md",
+        page: HOME_PAGE,
         manifest: context.manifest,
-        outline: PAGE_DEFINITIONS["Home.md"]?.outline ?? "",
+        outline: PAGE_DEFINITIONS[HOME_PAGE]?.outline ?? "",
         evidence: safeEvidence,
-        extraNotes: "Home.md 缺失，请先生成 Manifest。",
+        extraNotes: `${HOME_PAGE} 缺失，请先生成 Manifest。`,
       });
       const markdown = await generateMarkdown(prompt, cwd, abortController);
       throwIfAborted(abortController);
@@ -375,8 +379,8 @@ export async function* generateWikiEvents(
       manifest = markdown;
       yield {
         type: "page",
-        path: "Home.md",
-        title: PAGE_DEFINITIONS["Home.md"]?.title ?? "Home",
+        path: HOME_PAGE,
+        title: PAGE_DEFINITIONS[HOME_PAGE]?.title ?? "Home",
         confidence,
         markdown,
         blindSpots,
@@ -387,7 +391,7 @@ export async function* generateWikiEvents(
     const perPage = Math.max(1, Math.floor(60 / Math.max(1, targetPages.length)));
 
     for (const page of targetPages) {
-      if (page === "Home.md") continue;
+      if (page === HOME_PAGE) continue;
       throwIfAborted(abortController);
       yield { type: "progress", phase: "drafting", pct, page, message: `Drafting ${page}` };
 
