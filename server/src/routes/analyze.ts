@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import type { AgentMessage } from "../llm/types.js";
 import { analyze } from "../agent.js";
 import { parseJson } from "./validate.js";
+import { streamSseEvents } from "./sse.js";
 
 const analyzeRouter = new Hono();
 
@@ -42,24 +42,15 @@ analyzeRouter.post("/", async (c) => {
 
   const params = parsed.data;
 
-  return streamSSE(c, async (stream) => {
-    try {
-      for await (const msg of analyze(params)) {
-        const event = toAnalyzeEvent(msg);
-        if (!event) continue;
-        await stream.writeSSE({
-          event: event.event,
-          data: JSON.stringify(event.data),
-        });
-      }
-    } catch (error) {
-      await stream.writeSSE({
-        event: "error",
-        data: JSON.stringify({
-          error: error instanceof Error ? error.message : "Unknown error",
-        }),
-      });
-    }
+  return streamSseEvents(c, {
+    createStream: (abortController) => analyze(params, { abortController }),
+    toEvent: toAnalyzeEvent,
+    onError: (error) => ({
+      event: "error",
+      data: {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+    }),
   });
 });
 

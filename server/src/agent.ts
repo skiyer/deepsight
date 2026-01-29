@@ -2,6 +2,7 @@ import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
 import { createAgentQuery } from "./llm/client.js";
 import type { AgentMessage } from "./llm/types.js";
 import { resolveWorkspacePaths } from "./runtime/paths.js";
+import { isAbortError } from "./runtime/abort.js";
 
 export interface AnalyzeParams {
   file: string;
@@ -38,7 +39,10 @@ ${params.focusLine}
 ${MODE_INSTRUCTIONS[params.mode]}`;
 }
 
-export async function* analyze(params: AnalyzeParams): AsyncGenerator<AgentMessage> {
+export async function* analyze(
+  params: AnalyzeParams,
+  options?: { abortController?: AbortController }
+): AsyncGenerator<AgentMessage> {
   // Convert paths if running in WSL
   const resolvedPaths = resolveWorkspacePaths({ cwd: params.cwd, file: params.file });
   const { cwd, file } = resolvedPaths;
@@ -97,6 +101,7 @@ export async function* analyze(params: AnalyzeParams): AsyncGenerator<AgentMessa
       prompt: userPrompt,
       cwd,
       systemPrompt,
+      abortController: options?.abortController,
     });
 
     console.log("[analyze] Query created, starting iteration...");
@@ -111,6 +116,9 @@ export async function* analyze(params: AnalyzeParams): AsyncGenerator<AgentMessa
 
     console.log(`[analyze] Completed. Total messages: ${messageCount}`);
   } catch (error) {
+    if (isAbortError(error, options?.abortController)) {
+      return;
+    }
     console.error("[analyze] Error during query:", error);
     throw error;
   }

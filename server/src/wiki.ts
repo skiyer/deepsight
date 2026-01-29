@@ -3,6 +3,7 @@ import path from "node:path";
 import { WIKI_PROMPT } from "./prompts.js";
 import { createAgentQuery } from "./llm/client.js";
 import { hasClaudeCli } from "./runtime/diagnostics.js";
+import { isAbortError } from "./runtime/abort.js";
 
 export type WikiEvent =
   | {
@@ -78,21 +79,18 @@ const DEFAULT_PAGES = Object.keys(PAGE_DEFINITIONS);
 
 const WIKI_GENERATION_ABORTED = "WIKI_GENERATION_ABORTED";
 
+const createAbortError = () => {
+  const error = new Error(WIKI_GENERATION_ABORTED);
+  error.name = "AbortError";
+  return error;
+};
+
 const throwIfAborted = (abortController: AbortController) => {
   if (abortController.signal.aborted) {
-    throw new Error(WIKI_GENERATION_ABORTED);
+    throw createAbortError();
   }
 };
 
-const isAbortError = (error: unknown, abortController: AbortController) => {
-  if (abortController.signal.aborted) return true;
-  if (!(error instanceof Error)) return false;
-  return (
-    error.message === WIKI_GENERATION_ABORTED ||
-    error.name === "AbortError" ||
-    /aborted/i.test(error.message)
-  );
-};
 
 function normalizePath(input: string): string {
   return input.replace(/\\/g, "/");
@@ -307,7 +305,7 @@ async function generateMarkdown(
     return output.trim();
   } catch (error) {
     if (isAbortError(error, abortController)) {
-      throw new Error(WIKI_GENERATION_ABORTED);
+      throw createAbortError();
     }
 
     const err = error as { message?: string; stack?: string; code?: string; stderr?: string };
