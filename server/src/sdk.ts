@@ -1,6 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { ALLOWED_TOOLS } from "./tools.js";
 
+const ALLOWED_TOOLS = ["Read", "Glob"] as const;
 const SDK_ENV = process.env as Record<string, string>;
 
 const BASE_OPTIONS = {
