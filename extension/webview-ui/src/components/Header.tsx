@@ -1,10 +1,5 @@
 import { Loader2, MapPin, Sparkles, Shield, Square } from 'lucide-react';
-
-type PageMode = 'analysis' | 'wiki';
-
-type WikiGenerationStatus = 'idle' | 'running' | 'done' | 'error' | 'canceled';
-
-type WikiGenerationPhase = 'scanning' | 'drafting' | 'writing' | '';
+import type { PageMode, WikiGenerationState } from '../types';
 
 interface HeaderProps {
   page: PageMode;
@@ -13,13 +8,7 @@ interface HeaderProps {
   mode: 'explain' | 'audit';
 
   // Wiki actions
-  wikiGeneration?: {
-    status: WikiGenerationStatus;
-    phase?: WikiGenerationPhase;
-    pct?: number;
-    message?: string;
-    page?: string;
-  };
+  wikiGeneration?: WikiGenerationState;
   onWikiGenerateAll?: () => void;
   onWikiCancelGeneration?: () => void;
 }
@@ -47,7 +36,7 @@ export function Header({
   const isWikiGenerating = isWiki && wikiGeneration?.status === 'running';
   const wikiPct = Math.max(0, Math.min(100, Math.floor(wikiGeneration?.pct ?? 0)));
 
-  const formatWikiPhase = (phase: WikiGenerationPhase) => {
+  const formatWikiPhase = (phase: WikiGenerationState['phase']) => {
     switch (phase) {
       case 'scanning':
         return '扫描中';

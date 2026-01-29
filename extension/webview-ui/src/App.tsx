@@ -6,8 +6,7 @@ import { Skeleton } from './components/Skeleton';
 import { EmptyState } from './components/EmptyState';
 import { ToolCall } from './components/ToolCall';
 import { Thinking } from './components/Thinking';
-
-type PageMode = 'analysis' | 'wiki';
+import type { PageMode, WikiGenerationState } from './types';
 
 interface VsCodeApi {
   postMessage(message: unknown): void;
@@ -64,19 +63,6 @@ interface WikiPageMeta {
   title: string;
   type: WikiPageType;
   order: number;
-}
-
-type WikiGenerationStatus = 'idle' | 'running' | 'done' | 'error' | 'canceled';
-
-type WikiGenerationPhase = 'scanning' | 'drafting' | 'writing' | '';
-
-interface WikiGenerationState {
-  status: WikiGenerationStatus;
-  phase: WikiGenerationPhase;
-  pct: number; // 0-100
-  message: string;
-  page: string;
-  error: string;
 }
 
 interface WikiState {
