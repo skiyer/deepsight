@@ -1,5 +1,15 @@
 import * as vscode from "vscode";
 
+const RELEVANT_SYMBOL_KINDS = new Set<vscode.SymbolKind>([
+  vscode.SymbolKind.Function,
+  vscode.SymbolKind.Method,
+  vscode.SymbolKind.Class,
+  vscode.SymbolKind.Constructor,
+  vscode.SymbolKind.Interface,
+  vscode.SymbolKind.Struct,
+  vscode.SymbolKind.Enum,
+]);
+
 export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
   public async provideCodeLenses(
     document: vscode.TextDocument,
@@ -37,16 +47,7 @@ export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
   }
 
   private isRelevantSymbol(symbol: vscode.DocumentSymbol): boolean {
-    const relevantKinds = [
-      vscode.SymbolKind.Function,
-      vscode.SymbolKind.Method,
-      vscode.SymbolKind.Class,
-      vscode.SymbolKind.Constructor,
-      vscode.SymbolKind.Interface,
-      vscode.SymbolKind.Struct,
-      vscode.SymbolKind.Enum
-    ];
-    return relevantKinds.includes(symbol.kind);
+    return RELEVANT_SYMBOL_KINDS.has(symbol.kind);
   }
 
   private collectRelevantSymbols(
