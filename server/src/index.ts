@@ -5,6 +5,8 @@ import { cors } from "hono/cors";
 import { analyzeRouter } from "./routes/analyze.js";
 import { wikiRouter } from "./routes/wiki.js";
 
+const DEFAULT_PORT = 3000;
+
 const app = new Hono();
 
 // Enable CORS for VS Code extension
@@ -25,11 +27,12 @@ app.route("/analyze", analyzeRouter);
 // Wiki generation endpoint
 app.route("/wiki", wikiRouter);
 
-const port = Number(process.env.DEEPSIGHT_PORT) || 3000;
+const port = Number.parseInt(process.env.DEEPSIGHT_PORT ?? String(DEFAULT_PORT), 10);
+const serverPort = Number.isFinite(port) && port > 0 ? port : DEFAULT_PORT;
 
 serve({
   fetch: app.fetch,
-  port,
+  port: serverPort,
 }, (info) => {
   console.log(`🚀 DeepSight server running on http://localhost:${info.port}`);
 });
