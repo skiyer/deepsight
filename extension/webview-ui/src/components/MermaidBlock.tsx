@@ -170,9 +170,7 @@ function ToolbarButton({
 
 export function MermaidBlock({ code }: { code: string }) {
   const id = useMemo(() => `mermaid-${Math.random().toString(36).slice(2)}`, []);
-  const containerRef = useRef<HTMLDivElement>(null);
   const diagramRef = useRef<HTMLDivElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const [theme, setTheme] = useState<MermaidTheme>(() => detectMermaidTheme());
   const [error, setError] = useState<string>('');
@@ -304,7 +302,6 @@ export function MermaidBlock({ code }: { code: string }) {
 
   return (
     <div
-      ref={containerRef}
       className="mermaid-block"
       style={{
         margin: '16px 0',
@@ -367,7 +364,6 @@ export function MermaidBlock({ code }: { code: string }) {
 
       {/* Diagram viewport - transparent top area, content starts below floating controls */}
       <div
-        ref={wrapperRef}
         className="mermaid-viewport"
         style={{
           overflow: 'hidden',
