@@ -146,7 +146,6 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
   evidenceNotes: string;
   homeMissing: boolean;
   limitExceeded: boolean;
-  usedFiles: string[];
 }> {
   const cwd = params.cwd;
   const exclude = params.scope.exclude;
@@ -157,7 +156,6 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
   };
 
   const state = { filesRead: 0, bytesRead: 0, limitExceeded: false };
-  const usedFiles: string[] = [];
   const snippets: string[] = [];
 
   const homePath = path.join(cwd, ".deepsight", "wiki", "Home.md");
@@ -176,7 +174,6 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
       if (nonEmptyLineCount >= 40) {
         manifest = body.trim();
         homeMissing = false;
-        usedFiles.push(normalizePath(homePath));
       }
     }
   } catch {
@@ -206,7 +203,6 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
     try {
       const content = await readFileSafe(fullPath, state, limits);
       if (!content) continue;
-      usedFiles.push(normalized);
       const preview = content.split("\n").slice(0, 40).join("\n");
       snippets.push(`File: ${relPath}\n${preview}`);
     } catch {
@@ -219,7 +215,7 @@ async function collectQuickContext(params: WikiGenerateParams): Promise<{
   }
 
   const evidenceNotes = snippets.join("\n\n");
-  return { manifest, evidenceNotes, homeMissing, limitExceeded: state.limitExceeded, usedFiles };
+  return { manifest, evidenceNotes, homeMissing, limitExceeded: state.limitExceeded };
 }
 
 function filterSensitiveNotes(notes: string, sensitivePaths: string[]): string {
