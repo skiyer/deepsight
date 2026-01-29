@@ -56,86 +56,31 @@ function generateHeadingId(children: React.ReactNode): string {
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const createHeading = (tag: keyof JSX.IntrinsicElements) => {
+    return ({ children, ...props }: { children: React.ReactNode }) => {
+      const id = generateHeadingId(children);
+      const Tag = tag;
+      return (
+        <Tag
+          id={id}
+          className="group font-semibold leading-tight"
+          {...props}
+        >
+          {children}
+          <HeadingAnchor id={id} />
+        </Tag>
+      );
+    };
+  };
+
   const components: Components = {
     // Headings with anchor links
-    h1({ children, ...props }) {
-      const id = generateHeadingId(children);
-      return (
-        <h1
-          id={id}
-          className="group font-semibold leading-tight"
-          {...props}
-        >
-          {children}
-          <HeadingAnchor id={id} />
-        </h1>
-      );
-    },
-    h2({ children, ...props }) {
-      const id = generateHeadingId(children);
-      return (
-        <h2
-          id={id}
-          className="group font-semibold leading-tight"
-          {...props}
-        >
-          {children}
-          <HeadingAnchor id={id} />
-        </h2>
-      );
-    },
-    h3({ children, ...props }) {
-      const id = generateHeadingId(children);
-      return (
-        <h3
-          id={id}
-          className="group font-semibold leading-tight"
-          {...props}
-        >
-          {children}
-          <HeadingAnchor id={id} />
-        </h3>
-      );
-    },
-    h4({ children, ...props }) {
-      const id = generateHeadingId(children);
-      return (
-        <h4
-          id={id}
-          className="group font-semibold leading-tight"
-          {...props}
-        >
-          {children}
-          <HeadingAnchor id={id} />
-        </h4>
-      );
-    },
-    h5({ children, ...props }) {
-      const id = generateHeadingId(children);
-      return (
-        <h5
-          id={id}
-          className="group font-semibold leading-tight"
-          {...props}
-        >
-          {children}
-          <HeadingAnchor id={id} />
-        </h5>
-      );
-    },
-    h6({ children, ...props }) {
-      const id = generateHeadingId(children);
-      return (
-        <h6
-          id={id}
-          className="group font-semibold leading-tight"
-          {...props}
-        >
-          {children}
-          <HeadingAnchor id={id} />
-        </h6>
-      );
-    },
+    h1: createHeading('h1'),
+    h2: createHeading('h2'),
+    h3: createHeading('h3'),
+    h4: createHeading('h4'),
+    h5: createHeading('h5'),
+    h6: createHeading('h6'),
 
     // Paragraphs
     p({ children, ...props }) {
