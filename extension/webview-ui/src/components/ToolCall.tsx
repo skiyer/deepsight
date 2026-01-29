@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { BookOpen, Search, Shell, FileEdit, Globe, CheckCircle2, Loader2, FileSearch } from 'lucide-react';
+import { BookOpen, Search, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface ToolCallProps {
   name: string;
@@ -10,12 +10,6 @@ interface ToolCallProps {
 const TOOL_ICONS: Record<string, ReactNode> = {
   Read: <BookOpen className="w-3.5 h-3.5" />,
   Glob: <Search className="w-3.5 h-3.5" />,
-  Grep: <FileSearch className="w-3.5 h-3.5" />,
-  Bash: <Shell className="w-3.5 h-3.5" />,
-  Write: <FileEdit className="w-3.5 h-3.5" />,
-  Edit: <FileEdit className="w-3.5 h-3.5" />,
-  WebFetch: <Globe className="w-3.5 h-3.5" />,
-  WebSearch: <Search className="w-3.5 h-3.5" />,
 };
 
 export function ToolCall({ name, status, info }: ToolCallProps) {

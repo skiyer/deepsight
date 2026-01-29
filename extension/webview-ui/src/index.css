@@ -221,9 +221,6 @@ body.vscode-dark {
   color: inherit;
 }
 
-.markdown-body img {
-  border-radius: 6px;
-}
 
 .markdown-body h1 .anchor-link,
 .markdown-body h2 .anchor-link,
@@ -303,14 +300,6 @@ body.vscode-dark {
   margin-top: 0.5em;
   margin-bottom: 0.5em;
   margin-left: 0;
-}
-
-.markdown-body blockquote > :first-child {
-  margin-top: 0;
-}
-
-.markdown-body blockquote > :last-child {
-  margin-bottom: 0;
 }
 
 /* Tables */
