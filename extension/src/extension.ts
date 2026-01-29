@@ -1,3 +1,4 @@
+import path from "node:path";
 import * as vscode from "vscode";
 import { DeepSightCodeLensProvider } from "./codelens";
 import { DeepSightViewProvider } from "./webview";
@@ -19,6 +20,8 @@ const SYMBOL_PATTERNS: RegExp[] = [
   // C/C++/Java: function/method with return type
   /(?:void|int|char|float|double|bool|auto|static|inline|public|private|protected|virtual|final|explicit|constexpr)\s+(?:[\w<>[\]]+\s+)*(\w+)\s*\(/,
 ];
+
+const getBasename = (value: string) => path.basename(value);
 
 export function activate(context: vscode.ExtensionContext) {
   // Create output channel for debugging
@@ -166,9 +169,9 @@ async function analyzeCode(
   const serverUrl = getServerUrl();
 
   const filePath = document.uri.fsPath;
-  const fileName = filePath.split(/[/\\]/).pop() || filePath;
+  const fileName = getBasename(filePath) || filePath;
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-  const cwd = workspaceFolder?.uri.fsPath || filePath.replace(/[/\\][^/\\]+$/, "");
+  const cwd = workspaceFolder?.uri.fsPath || path.dirname(filePath);
 
   // Get symbol name at line for display
   const lineText = document.lineAt(line).text;
@@ -655,7 +658,7 @@ function handleSSEMessage(msg: any, msgIndex: number): boolean {
 function getToolDisplayInfo(toolName: string, input: any): string {
   switch (toolName) {
     case "Read":
-      return input.file_path ? `${input.file_path.split(/[/\\]/).pop()}` : "";
+      return input.file_path ? getBasename(String(input.file_path)) : "";
     case "Glob":
       return input.pattern ? `${input.pattern}` : "";
     default: {
