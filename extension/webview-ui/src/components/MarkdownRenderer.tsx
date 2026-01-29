@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CodeBlock } from './CodeBlock';
@@ -8,6 +8,9 @@ import type { Components } from 'react-markdown';
 interface MarkdownRendererProps {
   content: string;
 }
+
+// Context to track if code is inside pre (block code) or inline
+const PreContext = createContext<boolean>(false);
 
 // GitHub-style anchor link for headings
 function HeadingAnchor({ id }: { id: string }) {
@@ -281,12 +284,13 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     },
 
     // Code blocks and inline code
-    code({ inline, className, children, ...props }) {
+    code({ className, children, ...props }) {
+      const inPre = useContext(PreContext);
       // `react-markdown` generates className like: "language-ts", "language-c-like", etc.
       const match = /language-([^\s]+)/.exec(className || '');
       const codeString = String(children).replace(/\n$/, '');
 
-      if (!inline || match) {
+      if (inPre || match) {
         const language = (match?.[1] || '').trim().toLowerCase();
 
         // Mermaid diagram: render as SVG instead of a plain code block.
@@ -305,6 +309,15 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         >
           {children}
         </code>
+      );
+    },
+
+    // Pre blocks wrap children in PreContext
+    pre({ children }) {
+      return (
+        <PreContext.Provider value={true}>
+          {children}
+        </PreContext.Provider>
       );
     },
 
