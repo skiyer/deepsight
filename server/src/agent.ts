@@ -14,6 +14,8 @@ export interface AnalyzeParams {
 const isWSL = process.platform === "linux" &&
   process.env.WSL_DISTRO_NAME !== undefined;
 
+const DEBUG_PROMPT = process.env.DEBUG_PROMPT === "true";
+
 /**
  * Convert Windows path to WSL path
  * e.g., "d:\MyWorks\project" -> "/mnt/d/MyWorks/project"
@@ -95,7 +97,6 @@ ${focusLineCode}
 ${params.mode === "explain" ? "请解释这段代码的功能和数据流。" : "请对这段代码进行安全审计。"}`;
 
   // 调试日志：显示完整的prompt输入
-  const DEBUG_PROMPT = process.env.DEBUG_PROMPT === "true";
   if (DEBUG_PROMPT) {
     console.log("=".repeat(80));
     console.log("[PROMPT DEBUG] System Prompt:");
