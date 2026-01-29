@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { WIKI_PROMPT } from "./prompts.js";
-import { createSdkQuery } from "./sdk.js";
+import { createAgentQuery } from "./llm/client.js";
 
 export type WikiEvent =
   | {
@@ -279,7 +279,7 @@ async function generateMarkdown(
   abortController: AbortController
 ): Promise<string> {
   try {
-    const q = createSdkQuery({
+    const q = createAgentQuery({
       prompt,
       cwd,
       systemPrompt: WIKI_PROMPT,

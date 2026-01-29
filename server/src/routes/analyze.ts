@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { AgentMessage } from "../llm/types.js";
 import { analyze } from "../agent.js";
 import { parseJson } from "./validate.js";
 
@@ -15,9 +15,9 @@ const AnalyzeRequestSchema = z.object({
   cwd: z.string(),
 });
 
-type AnalyzeSseEvent = { event: string; data: SDKMessage };
+type AnalyzeSseEvent = { event: string; data: AgentMessage };
 
-const toAnalyzeEvent = (msg: SDKMessage): AnalyzeSseEvent | null => {
+const toAnalyzeEvent = (msg: AgentMessage): AnalyzeSseEvent | null => {
   if (msg.type === "stream_event") {
     return { event: "chunk", data: msg };
   }

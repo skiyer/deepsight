@@ -8,12 +8,6 @@ import { ToolCall } from './components/ToolCall';
 import { Thinking } from './components/Thinking';
 import type { PageMode, WikiGenerationState } from './types';
 
-interface VsCodeApi {
-  postMessage(message: unknown): void;
-  getState(): ViewState | undefined;
-  setState(state: ViewState): void;
-}
-
 // Block types
 interface BaseBlock {
   id: string;

@@ -1,7 +1,7 @@
-import { type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { execSync } from "child_process";
 import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
-import { createSdkQuery } from "./sdk.js";
+import { createAgentQuery } from "./llm/client.js";
+import type { AgentMessage } from "./llm/types.js";
 
 export interface AnalyzeParams {
   file: string;
@@ -90,7 +90,7 @@ ${params.focusLine}
 ${MODE_INSTRUCTIONS[params.mode]}`;
 }
 
-export async function* analyze(params: AnalyzeParams): AsyncGenerator<SDKMessage> {
+export async function* analyze(params: AnalyzeParams): AsyncGenerator<AgentMessage> {
   // Convert paths if running in WSL
   let cwd = params.cwd;
   let file = params.file;
@@ -147,7 +147,7 @@ export async function* analyze(params: AnalyzeParams): AsyncGenerator<SDKMessage
   });
 
   try {
-    const q = createSdkQuery({
+    const q = createAgentQuery({
       prompt: userPrompt,
       cwd,
       systemPrompt,
