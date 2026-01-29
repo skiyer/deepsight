@@ -4,8 +4,8 @@ import { execSync } from "child_process";
 
 export interface AnalyzeParams {
   file: string;
-  code: string;
   line: number;
+  lineText: string;
   mode: "explain" | "audit";
   cwd: string;
 }
@@ -84,12 +84,7 @@ export async function* analyze(params: AnalyzeParams): AsyncGenerator<SDKMessage
 
   const systemPrompt = params.mode === "explain" ? EXPLAIN_PROMPT : AUDIT_PROMPT;
 
-  // 只提取焦点行的代码
-  const codeLines = params.code.split('\n');
-  const focusLineIndex = params.line - 1; // 转换为0-based索引
-  const focusLineCode = (focusLineIndex >= 0 && focusLineIndex < codeLines.length)
-    ? codeLines[focusLineIndex].trim()
-    : "[无法获取焦点行代码]";
+  const focusLineCode = params.lineText.trim() || "[无法获取焦点行代码]";
 
   const userPrompt = `请分析以下代码（文件：${file}，焦点行：${params.line}）：
 

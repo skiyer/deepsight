@@ -146,7 +146,6 @@ async function analyzeCode(
 
   const filePath = document.uri.fsPath;
   const fileName = filePath.split(/[/\\]/).pop() || filePath;
-  const code = document.getText();
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
   const cwd = workspaceFolder?.uri.fsPath || filePath.replace(/[/\\][^/\\]+$/, "");
 
@@ -204,8 +203,8 @@ async function analyzeCode(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         file: filePath,
-        code,
         line: line + 1, // 1-indexed
+        lineText,
         mode,
         cwd,
       }),

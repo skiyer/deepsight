@@ -7,8 +7,8 @@ const analyzeRouter = new Hono();
 
 const AnalyzeRequestSchema = z.object({
   file: z.string(),
-  code: z.string(),
   line: z.number(),
+  lineText: z.string(),
   mode: z.enum(["explain", "audit"]),
   cwd: z.string(),
 });
