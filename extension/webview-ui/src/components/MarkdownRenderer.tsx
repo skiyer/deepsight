@@ -55,32 +55,36 @@ function generateHeadingId(children: React.ReactNode): string {
     .replace(/^-|-$/g, '');
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  const createHeading = (tag: keyof JSX.IntrinsicElements) => {
-    return ({ children, ...props }: { children: React.ReactNode }) => {
-      const id = generateHeadingId(children);
-      const Tag = tag;
-      return (
-        <Tag
-          id={id}
-          className="group font-semibold leading-tight"
-          {...props}
-        >
-          {children}
-          <HeadingAnchor id={id} />
-        </Tag>
-      );
-    };
+const createHeading = (tag: keyof JSX.IntrinsicElements) => {
+  return ({ children, ...props }: { children: React.ReactNode }) => {
+    const id = generateHeadingId(children);
+    const Tag = tag;
+    return (
+      <Tag
+        id={id}
+        className="group font-semibold leading-tight"
+        {...props}
+      >
+        {children}
+        <HeadingAnchor id={id} />
+      </Tag>
+    );
   };
+};
 
+const HEADING_COMPONENTS: Pick<Components, 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'> = {
+  h1: createHeading('h1'),
+  h2: createHeading('h2'),
+  h3: createHeading('h3'),
+  h4: createHeading('h4'),
+  h5: createHeading('h5'),
+  h6: createHeading('h6'),
+};
+
+export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const components: Components = {
     // Headings with anchor links
-    h1: createHeading('h1'),
-    h2: createHeading('h2'),
-    h3: createHeading('h3'),
-    h4: createHeading('h4'),
-    h5: createHeading('h5'),
-    h6: createHeading('h6'),
+    ...HEADING_COMPONENTS,
 
     // Paragraphs
     p({ children, ...props }) {
