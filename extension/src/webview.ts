@@ -85,7 +85,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "deepsight.resultView";
   private _view?: vscode.WebviewView;
   private _isReady: boolean = false;
-  private _resolveWhenReady?: () => void;
 
   // Single source of truth - complete state
   private _state: ViewState = {
@@ -136,16 +135,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
     return `block-${++this._blockIdCounter}`;
   }
 
-  // Wait for webview to be ready
-  public async waitForReady(): Promise<void> {
-    if (this._isReady && this._view) {
-      return;
-    }
-    return new Promise((resolve) => {
-      this._resolveWhenReady = resolve;
-    });
-  }
-
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
@@ -164,10 +153,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
       if (message?.type === "ready") {
         this._isReady = true;
         this._syncState();
-        if (this._resolveWhenReady) {
-          this._resolveWhenReady();
-          this._resolveWhenReady = undefined;
-        }
         return;
       }
 
