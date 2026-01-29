@@ -17,6 +17,16 @@ const isWSL = process.platform === "linux" &&
 
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === "true";
 
+const SYSTEM_PROMPTS = {
+  explain: EXPLAIN_PROMPT,
+  audit: AUDIT_PROMPT,
+} as const;
+
+const MODE_INSTRUCTIONS = {
+  explain: "请解释这段代码的功能和数据流。",
+  audit: "请对这段代码进行安全审计。",
+} as const;
+
 /**
  * Convert Windows path to WSL path
  * e.g., "d:\MyWorks\project" -> "/mnt/d/MyWorks/project"
@@ -65,6 +75,21 @@ function logEnvironmentInfo() {
 // Log on module load
 logEnvironmentInfo();
 
+function buildUserPrompt(params: {
+  file: string;
+  line: number;
+  focusLine: string;
+  mode: AnalyzeParams["mode"];
+}): string {
+  return `请分析以下代码（文件：${params.file}，焦点行：${params.line}）：
+
+\`\`\`
+${params.focusLine}
+\`\`\`
+
+${MODE_INSTRUCTIONS[params.mode]}`;
+}
+
 export async function* analyze(params: AnalyzeParams): AsyncGenerator<SDKMessage> {
   // Convert paths if running in WSL
   let cwd = params.cwd;
@@ -85,17 +110,16 @@ export async function* analyze(params: AnalyzeParams): AsyncGenerator<SDKMessage
     cwd,
   });
 
-  const systemPrompt = params.mode === "explain" ? EXPLAIN_PROMPT : AUDIT_PROMPT;
+  const systemPrompt = SYSTEM_PROMPTS[params.mode];
 
   const focusLineCode = params.lineText.trim() || "[无法获取焦点行代码]";
 
-  const userPrompt = `请分析以下代码（文件：${file}，焦点行：${params.line}）：
-
-\`\`\`
-${focusLineCode}
-\`\`\`
-
-${params.mode === "explain" ? "请解释这段代码的功能和数据流。" : "请对这段代码进行安全审计。"}`;
+  const userPrompt = buildUserPrompt({
+    file,
+    line: params.line,
+    focusLine: focusLineCode,
+    mode: params.mode,
+  });
 
   // 调试日志：显示完整的prompt输入
   if (DEBUG_PROMPT) {
