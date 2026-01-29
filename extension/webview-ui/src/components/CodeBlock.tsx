@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark, atomOneLight } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
@@ -104,7 +103,7 @@ function isDarkThemeBackground(): boolean {
 }
 
 export function CodeBlock({ language, code }: CodeBlockProps) {
-  const [isDark] = useState(() => isDarkThemeBackground());
+  const isDark = isDarkThemeBackground();
 
   // IMPORTANT: When language is empty/unknown, force "text".
   // Otherwise react-syntax-highlighter/highlight.js will auto-detect the language,

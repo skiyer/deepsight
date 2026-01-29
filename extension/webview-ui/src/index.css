@@ -201,11 +201,15 @@ body.vscode-dark {
 .markdown-body table {
   display: table;
   width: 100%;
+  border-spacing: 0;
+  border-collapse: collapse;
+  border-color: var(--md-border, #d0d7de);
 }
 
 .markdown-body th,
 .markdown-body td {
   padding: 6px 13px;
+  border-color: var(--md-border, #d0d7de);
 }
 
 .markdown-body tr {
@@ -302,12 +306,6 @@ body.vscode-dark {
   margin-left: 0;
 }
 
-/* Tables */
-.markdown-body table {
-  border-spacing: 0;
-  border-collapse: collapse;
-}
-
 /* Code - GitHub style */
 .markdown-body code {
   font-family: var(--vscode-editor-font-family, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace);
@@ -321,12 +319,6 @@ body.vscode-dark {
   border-radius: 6px;
   font-size: 85%;
   padding: 0.2em 0.4em;
-}
-
-.markdown-body code {
-  background-color: var(--md-code-bg, #f6f8fa);
-  border: 1px solid var(--md-border, #d0d7de);
-  border-radius: 6px;
 }
 
 .markdown-body pre code {
@@ -394,15 +386,6 @@ body.vscode-dark {
 
 .markdown-body blockquote > :last-child {
   margin-bottom: 0;
-}
-
-.markdown-body table {
-  border-color: var(--md-border, #d0d7de);
-}
-
-.markdown-body th,
-.markdown-body td {
-  border-color: var(--md-border, #d0d7de);
 }
 
 .markdown-body thead {
