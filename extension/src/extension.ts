@@ -9,6 +9,16 @@ let viewProvider: DeepSightViewProvider;
 let isAnalyzing = false;
 let wikiAbortController: AbortController | null = null;
 
+const SYMBOL_PATTERNS: RegExp[] = [
+  // JavaScript/TypeScript: function, class, arrow function assignment
+  /(?:function|class)\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=/,
+  // Python: def, class
+  /(?:def|class)\s+(\w+)/,
+  // Go/Rust: func, fn, struct, impl
+  /(?:func|fn|struct|impl)\s+(?:\([^)]+\)\s+)?(\w+)/,
+  // C/C++/Java: function/method with return type
+  /(?:void|int|char|float|double|bool|auto|static|inline|public|private|protected|virtual|final|explicit|constexpr)\s+(?:[\w<>[\]]+\s+)*(\w+)\s*\(/,
+];
 
 export function activate(context: vscode.ExtensionContext) {
   // Create output channel for debugging
@@ -129,6 +139,19 @@ function getWikiLimits(): { maxFilesRead: number; maxBytesRead: number } {
   return { maxFilesRead, maxBytesRead };
 }
 
+function extractSymbolName(lineText: string): string | null {
+  for (const pattern of SYMBOL_PATTERNS) {
+    const match = lineText.match(pattern);
+    if (!match) continue;
+    for (let i = 1; i < match.length; i++) {
+      if (match[i]) {
+        return match[i];
+      }
+    }
+  }
+  return null;
+}
+
 async function analyzeCode(
   document: vscode.TextDocument,
   line: number,
@@ -150,32 +173,7 @@ async function analyzeCode(
   // Get symbol name at line for display
   const lineText = document.lineAt(line).text;
 
-  // Try multiple patterns for different languages
-  const patterns = [
-    // JavaScript/TypeScript: function, class, arrow function assignment
-    /(?:function|class)\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=/,
-    // Python: def, class
-    /(?:def|class)\s+(\w+)/,
-    // Go/Rust: func, fn, struct, impl
-    /(?:func|fn|struct|impl)\s+(?:\([^)]+\)\s+)?(\w+)/,
-    // C/C++/Java: function/method with return type
-    /(?:void|int|char|float|double|bool|auto|static|inline|public|private|protected|virtual|final|explicit|constexpr)\s+(?:[\w<>[\]]+\s+)*(\w+)\s*\(/,
-  ];
-
-  let symbolName: string | null = null;
-  for (const pattern of patterns) {
-    const match = lineText.match(pattern);
-    if (match) {
-      // Find the first capturing group that has a value
-      for (let i = 1; i < match.length; i++) {
-        if (match[i]) {
-          symbolName = match[i];
-          break;
-        }
-      }
-      if (symbolName) break;
-    }
-  }
+  const symbolName = extractSymbolName(lineText);
 
   const anchor = symbolName || `Line ${line + 1}`;
 
