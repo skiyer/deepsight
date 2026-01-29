@@ -49,7 +49,6 @@ type WikiGenerationPhase = "scanning" | "drafting" | "writing" | "";
 
 interface WikiGenerationState {
   status: WikiGenerationStatus;
-  mode: "full" | "current" | "";
   phase: WikiGenerationPhase;
   pct: number; // 0-100
   message: string;
@@ -63,9 +62,7 @@ interface WikiState {
   pages: WikiPageMeta[];
   currentPath: string;
   content: string;
-  dirty: boolean;
   error: string;
-  lastSavedAt: string;
 
   generation: WikiGenerationState;
 }
@@ -106,12 +103,9 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
       pages: [],
       currentPath: "",
       content: "",
-      dirty: false,
       error: "",
-      lastSavedAt: "",
       generation: {
         status: "idle",
-        mode: "",
         phase: "",
         pct: 0,
         message: "",
@@ -452,12 +446,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
     return { version: Number(parsed?.version || 1), pages };
   }
 
-  private async _writeWikiIndex(root: vscode.Uri, index: { version: number; pages: WikiPageMeta[] }): Promise<void> {
-    const indexUri = this._wikiIndexUri(root);
-    const encoder = new TextEncoder();
-    await vscode.workspace.fs.writeFile(indexUri, encoder.encode(JSON.stringify(index, null, 2)));
-  }
-
   private async _refreshWikiPages(): Promise<void> {
     const root = this._getWorkspaceRootUri();
     if (!root) {
@@ -487,7 +475,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
 
     this._state.wiki.currentPath = safePath;
     this._state.wiki.content = content;
-    this._state.wiki.dirty = false;
     this._state.wiki.error = "";
     this._state.wiki.status = "idle";
     this._syncState();
@@ -507,10 +494,9 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
   }
 
   // Wiki generation state (UI only; actual generation handled in extension.ts)
-  public startWikiGeneration(mode: "full" | "current") {
+  public startWikiGeneration() {
     this._state.wiki.generation = {
       status: "running",
-      mode,
       phase: "scanning",
       pct: 0,
       message: "",
@@ -569,19 +555,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
       status: "error",
       error,
       message: error,
-    };
-    this._syncState();
-  }
-
-  public clearWikiGeneration() {
-    this._state.wiki.generation = {
-      status: "idle",
-      mode: "",
-      phase: "",
-      pct: 0,
-      message: "",
-      page: "",
-      error: "",
     };
     this._syncState();
   }

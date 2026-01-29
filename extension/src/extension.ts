@@ -71,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   const generateWikiCommand = vscode.commands.registerCommand("deepsight.generateWiki", async () => {
-    await generateWiki("full");
+    await generateWiki();
   });
 
   const cancelWikiCommand = vscode.commands.registerCommand("deepsight.cancelWiki", () => {
@@ -276,7 +276,7 @@ async function analyzeCode(
   }
 }
 
-async function generateWiki(mode: "full" | "current") {
+async function generateWiki() {
   if (wikiAbortController) {
     vscode.window.showInformationMessage("DeepSight: Wiki 正在生成中，请先取消或等待完成。");
     return;
@@ -299,8 +299,6 @@ async function generateWiki(mode: "full" | "current") {
 
   const requestBody = {
     cwd,
-    mode,
-    currentPath: "",
     scope,
     pages: DEFAULT_WIKI_PAGES,
     sensitivePaths,
@@ -310,7 +308,6 @@ async function generateWiki(mode: "full" | "current") {
   outputChannel.appendLine(`\n${"=".repeat(50)}`);
   outputChannel.appendLine(`[${new Date().toISOString()}] Starting wiki generation`);
   outputChannel.appendLine(`  Server: ${serverUrl}`);
-  outputChannel.appendLine(`  Mode: ${mode}`);
   outputChannel.appendLine(`  Scope: include=${JSON.stringify(scope.include)} exclude=${JSON.stringify(scope.exclude)}`);
   outputChannel.appendLine(`  SensitivePaths: ${JSON.stringify(sensitivePaths)}`);
   outputChannel.appendLine(`  Limits: ${JSON.stringify(limits)}`);
@@ -319,7 +316,7 @@ async function generateWiki(mode: "full" | "current") {
   wikiAbortController = controller;
 
   // Sync generation state to Webview
-  viewProvider.startWikiGeneration(mode);
+  viewProvider.startWikiGeneration();
 
   try {
     const response = await fetch(`${serverUrl}/wiki/generate`, {

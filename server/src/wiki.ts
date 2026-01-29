@@ -25,8 +25,6 @@ export type WikiEvent =
 
 export interface WikiGenerateParams {
   cwd: string;
-  mode: "full" | "current";
-  currentPath?: string;
   scope: { include: string[]; exclude: string[] };
   pages: string[];
   sensitivePaths?: string[];

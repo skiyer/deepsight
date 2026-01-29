@@ -7,8 +7,6 @@ const wikiRouter = new Hono();
 
 const WikiGenerateRequestSchema = z.object({
   cwd: z.string(),
-  mode: z.enum(["full", "current"]),
-  currentPath: z.string().optional(),
   scope: z.object({
     include: z.array(z.string()),
     exclude: z.array(z.string()),

@@ -72,7 +72,6 @@ type WikiGenerationPhase = 'scanning' | 'drafting' | 'writing' | '';
 
 interface WikiGenerationState {
   status: WikiGenerationStatus;
-  mode: 'full' | 'current' | '';
   phase: WikiGenerationPhase;
   pct: number; // 0-100
   message: string;
@@ -86,9 +85,7 @@ interface WikiState {
   pages: WikiPageMeta[];
   currentPath: string;
   content: string;
-  dirty: boolean;
   error: string;
-  lastSavedAt: string;
 
   generation: WikiGenerationState;
 }
@@ -107,12 +104,9 @@ const initialState: ViewState = {
     pages: [],
     currentPath: '',
     content: '',
-    dirty: false,
     error: '',
-    lastSavedAt: '',
     generation: {
       status: 'idle',
-      mode: '',
       phase: '',
       pct: 0,
       message: '',
