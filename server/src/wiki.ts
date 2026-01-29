@@ -26,7 +26,7 @@ export type WikiEvent =
 export interface WikiGenerateParams {
   cwd: string;
   scope: { include: string[]; exclude: string[] };
-  pages: string[];
+  pages?: string[];
   sensitivePaths?: string[];
   limits?: { maxFilesRead?: number; maxBytesRead?: number };
 }

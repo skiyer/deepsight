@@ -9,14 +9,6 @@ let viewProvider: DeepSightViewProvider;
 let isAnalyzing = false;
 let wikiAbortController: AbortController | null = null;
 
-const DEFAULT_WIKI_PAGES = [
-  "Home.md",
-  "Architecture.md",
-  "Modules.md",
-  "Dataflow.md",
-  "TrustBoundaries.md",
-  "AttackSurface.md",
-];
 
 export function activate(context: vscode.ExtensionContext) {
   // Create output channel for debugging
@@ -300,7 +292,6 @@ async function generateWiki() {
   const requestBody = {
     cwd,
     scope,
-    pages: DEFAULT_WIKI_PAGES,
     sensitivePaths,
     limits,
   };

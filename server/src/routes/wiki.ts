@@ -11,7 +11,7 @@ const WikiGenerateRequestSchema = z.object({
     include: z.array(z.string()),
     exclude: z.array(z.string()),
   }),
-  pages: z.array(z.string()),
+  pages: z.array(z.string()).optional(),
   sensitivePaths: z.array(z.string()).optional(),
   limits: z
     .object({
