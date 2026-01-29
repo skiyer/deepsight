@@ -100,6 +100,49 @@ const initialState: ViewState = {
   },
 };
 
+const splitFrontMatter = (markdown: string): { frontMatter: string; body: string } => {
+  if (!markdown.startsWith('---')) return { frontMatter: '', body: markdown };
+  const lines = markdown.split('\n');
+  if (lines.length < 3) return { frontMatter: '', body: markdown };
+  if (lines[0].trim() !== '---') return { frontMatter: '', body: markdown };
+
+  let end = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === '---') {
+      end = i;
+      break;
+    }
+  }
+  if (end === -1) return { frontMatter: '', body: markdown };
+
+  const frontMatter = lines.slice(1, end).join('\n').trim();
+  const body = lines.slice(end + 1).join('\n').replace(/^\n+/, '');
+  return { frontMatter, body };
+};
+
+const parseFrontMatter = (frontMatter: string): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const line of frontMatter.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf(':');
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    let value = trimmed.slice(idx + 1).trim();
+
+    // Format time fields (ISO 8601 format)
+    if ((key === 'updated' || key === 'created') && value) {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        value = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+      }
+    }
+
+    if (key) out[key] = value;
+  }
+  return out;
+};
+
 interface AppProps {
   vscode: VsCodeApi;
 }
@@ -261,49 +304,6 @@ export default function App({ vscode }: AppProps) {
 
   // Wiki UI local state (editor/preview/search)
   // Wiki is read-only in Webview; users edit files directly in VS Code.
-
-  const splitFrontMatter = (markdown: string): { frontMatter: string; body: string } => {
-    if (!markdown.startsWith('---')) return { frontMatter: '', body: markdown };
-    const lines = markdown.split('\n');
-    if (lines.length < 3) return { frontMatter: '', body: markdown };
-    if (lines[0].trim() !== '---') return { frontMatter: '', body: markdown };
-
-    let end = -1;
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim() === '---') {
-        end = i;
-        break;
-      }
-    }
-    if (end === -1) return { frontMatter: '', body: markdown };
-
-    const frontMatter = lines.slice(1, end).join('\n').trim();
-    const body = lines.slice(end + 1).join('\n').replace(/^\n+/, '');
-    return { frontMatter, body };
-  };
-
-  const parseFrontMatter = (frontMatter: string): Record<string, string> => {
-    const out: Record<string, string> = {};
-    for (const line of frontMatter.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const idx = trimmed.indexOf(':');
-      if (idx === -1) continue;
-      let key = trimmed.slice(0, idx).trim();
-      let value = trimmed.slice(idx + 1).trim();
-
-      // Format time fields (ISO 8601 format)
-      if ((key === 'updated' || key === 'created') && value) {
-        const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-          value = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-        }
-      }
-
-      if (key) out[key] = value;
-    }
-    return out;
-  };
 
   const navigate = (page: PageMode) => {
     vscode.postMessage({ type: 'navigate', page });
