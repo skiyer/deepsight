@@ -1,11 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #36a6ff;
-  --color-primary-muted: #0c8ce9;
-  --color-mode-explain: #36a6ff;
-  --color-mode-audit: #d97706;
-
   --animate-fade-in: fadeIn 0.2s ease-out;
   --animate-shimmer: shimmer 1.5s infinite;
   --animate-spin-slow: spin 0.8s linear infinite;
