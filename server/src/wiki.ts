@@ -31,32 +31,34 @@ export interface WikiGenerateParams {
   limits?: { maxFilesRead?: number; maxBytesRead?: number };
 }
 
-const DEFAULT_PAGES = [
-  "Home.md",
-  "Architecture.md",
-  "Modules.md",
-  "Dataflow.md",
-  "TrustBoundaries.md",
-  "AttackSurface.md",
-];
-
-const PAGE_TITLES: Record<string, string> = {
-  "Home.md": "主页",
-  "Architecture.md": "系统架构",
-  "Modules.md": "模块",
-  "Dataflow.md": "数据流",
-  "TrustBoundaries.md": "信任边界",
-  "AttackSurface.md": "攻击面",
+const PAGE_DEFINITIONS: Record<string, { title: string; outline: string }> = {
+  "Home.md": {
+    title: "主页",
+    outline: "Summary / Tech Stack / Entrypoints / Core Modules / Security Focus",
+  },
+  "Architecture.md": {
+    title: "系统架构",
+    outline: "技术栈与依赖 / 部署运行形态 / 核心组件职责 / 数据存储与状态",
+  },
+  "Modules.md": {
+    title: "模块",
+    outline: "模块划分原则 / 模块清单 / 依赖关系",
+  },
+  "Dataflow.md": {
+    title: "数据流",
+    outline: "关键数据对象 / 关键数据流 / 安全相关 Sink",
+  },
+  "TrustBoundaries.md": {
+    title: "信任边界",
+    outline: "信任边界图 / 输入入口 / 权限模型 / 外部依赖",
+  },
+  "AttackSurface.md": {
+    title: "攻击面",
+    outline: "入口 / 文件与内容处理 / 网络通信 / 高风险点",
+  },
 };
 
-const PAGE_OUTLINES: Record<string, string> = {
-  "Home.md": "Summary / Tech Stack / Entrypoints / Core Modules / Security Focus",
-  "Architecture.md": "技术栈与依赖 / 部署运行形态 / 核心组件职责 / 数据存储与状态",
-  "Modules.md": "模块划分原则 / 模块清单 / 依赖关系",
-  "Dataflow.md": "关键数据对象 / 关键数据流 / 安全相关 Sink",
-  "TrustBoundaries.md": "信任边界图 / 输入入口 / 权限模型 / 外部依赖",
-  "AttackSurface.md": "入口 / 文件与内容处理 / 网络通信 / 高风险点",
-};
+const DEFAULT_PAGES = Object.keys(PAGE_DEFINITIONS);
 
 const WIKI_GENERATION_ABORTED = "WIKI_GENERATION_ABORTED";
 
@@ -375,7 +377,7 @@ export async function* generateWikiEvents(
       const prompt = buildUserPrompt({
         page: "Home.md",
         manifest: context.manifest,
-        outline: PAGE_OUTLINES["Home.md"],
+        outline: PAGE_DEFINITIONS["Home.md"]?.outline ?? "",
         evidence: safeEvidence,
         extraNotes: "Home.md 缺失，请先生成 Manifest。",
       });
@@ -388,7 +390,7 @@ export async function* generateWikiEvents(
       yield {
         type: "page",
         path: "Home.md",
-        title: PAGE_TITLES["Home.md"],
+        title: PAGE_DEFINITIONS["Home.md"]?.title ?? "Home",
         confidence,
         markdown,
         blindSpots,
@@ -403,7 +405,7 @@ export async function* generateWikiEvents(
       throwIfAborted();
       yield { type: "progress", phase: "drafting", pct, page, message: `Drafting ${page}` };
 
-      const outline = PAGE_OUTLINES[page] || "";
+      const outline = PAGE_DEFINITIONS[page]?.outline ?? "";
       const prompt = buildUserPrompt({
         page,
         manifest,
@@ -419,7 +421,7 @@ export async function* generateWikiEvents(
       yield {
         type: "page",
         path: page,
-        title: PAGE_TITLES[page] || page.replace(/\.md$/i, ""),
+        title: PAGE_DEFINITIONS[page]?.title ?? page.replace(/\.md$/i, ""),
         confidence,
         markdown,
         blindSpots,
