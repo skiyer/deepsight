@@ -81,7 +81,6 @@ interface WikiGenerationState {
 
 interface WikiState {
   status: 'idle' | 'loading' | 'error';
-  workspaceRoot: string;
   pages: WikiPageMeta[];
   currentPath: string;
   content: string;
@@ -100,7 +99,6 @@ const initialState: ViewState = {
   page: 'analysis',
   wiki: {
     status: 'idle',
-    workspaceRoot: '',
     pages: [],
     currentPath: '',
     content: '',

@@ -58,7 +58,6 @@ interface WikiGenerationState {
 
 interface WikiState {
   status: "idle" | "loading" | "error";
-  workspaceRoot: string;
   pages: WikiPageMeta[];
   currentPath: string;
   content: string;
@@ -99,7 +98,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
     page: "analysis",
     wiki: {
       status: "idle",
-      workspaceRoot: "",
       pages: [],
       currentPath: "",
       content: "",
@@ -377,8 +375,6 @@ export class DeepSightViewProvider implements vscode.WebviewViewProvider {
       this._syncState();
       return;
     }
-
-    this._state.wiki.workspaceRoot = root.fsPath;
 
     this._ensureWikiWatcher(root);
 
