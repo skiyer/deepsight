@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { analyze } from "../agent.js";
 import { parseJson } from "./validate.js";
 
@@ -14,6 +15,25 @@ const AnalyzeRequestSchema = z.object({
   cwd: z.string(),
 });
 
+type AnalyzeSseEvent = { event: string; data: SDKMessage };
+
+const toAnalyzeEvent = (msg: SDKMessage): AnalyzeSseEvent | null => {
+  if (msg.type === "stream_event") {
+    return { event: "chunk", data: msg };
+  }
+  if (msg.type === "assistant") {
+    return { event: "message", data: msg };
+  }
+  if (msg.type === "result") {
+    const event = msg.subtype === "success" ? "done" : "error";
+    return { event, data: msg };
+  }
+  if (msg.type === "system") {
+    return { event: "system", data: msg };
+  }
+  return null;
+};
+
 analyzeRouter.post("/", async (c) => {
   const parsed = await parseJson(c, AnalyzeRequestSchema);
   if (!parsed.ok) {
@@ -25,32 +45,12 @@ analyzeRouter.post("/", async (c) => {
   return streamSSE(c, async (stream) => {
     try {
       for await (const msg of analyze(params)) {
-        if (msg.type === "stream_event") {
-          // Partial message for typewriter effect
-          await stream.writeSSE({
-            event: "chunk",
-            data: JSON.stringify(msg),
-          });
-        } else if (msg.type === "assistant") {
-          // Complete assistant message
-          await stream.writeSSE({
-            event: "message",
-            data: JSON.stringify(msg),
-          });
-        } else if (msg.type === "result") {
-          // Final result
-          const event = msg.subtype === "success" ? "done" : "error";
-          await stream.writeSSE({
-            event,
-            data: JSON.stringify(msg),
-          });
-        } else if (msg.type === "system") {
-          // System init message
-          await stream.writeSSE({
-            event: "system",
-            data: JSON.stringify(msg),
-          });
-        }
+        const event = toAnalyzeEvent(msg);
+        if (!event) continue;
+        await stream.writeSSE({
+          event: event.event,
+          data: JSON.stringify(event.data),
+        });
       }
     } catch (error) {
       await stream.writeSSE({
