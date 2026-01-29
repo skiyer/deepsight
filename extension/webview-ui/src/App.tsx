@@ -143,6 +143,8 @@ const parseFrontMatter = (frontMatter: string): Record<string, string> => {
   return out;
 };
 
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
 interface AppProps {
   vscode: VsCodeApi;
 }
@@ -331,8 +333,6 @@ export default function App({ vscode }: AppProps) {
   const isLoading = state.status === 'loading';
   const hasBlocks = state.blocks.length > 0;
   const isStreaming = state.status === 'streaming';
-
-  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
   const beginResizeWikiSidebar = (e: React.MouseEvent) => {
     if (state.page !== 'wiki') return;
