@@ -3,6 +3,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { WIKI_PROMPT } from "./prompts.js";
+import { ALLOWED_TOOLS } from "./tools.js";
 
 export type WikiEvent =
   | {
@@ -270,7 +271,7 @@ async function generateMarkdown(
       options: {
         cwd,
         systemPrompt: WIKI_PROMPT,
-        allowedTools: ["Read", "Glob"],
+        allowedTools: ALLOWED_TOOLS,
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         includePartialMessages: true,

@@ -1,6 +1,7 @@
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
 import { execSync } from "child_process";
+import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
+import { ALLOWED_TOOLS } from "./tools.js";
 
 export interface AnalyzeParams {
   file: string;
@@ -127,7 +128,7 @@ ${params.mode === "explain" ? "请解释这段代码的功能和数据流。" : 
       options: {
         cwd,
         systemPrompt,
-	allowedTools: ["Read", "Glob"],
+        allowedTools: ALLOWED_TOOLS,
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         includePartialMessages: true,
