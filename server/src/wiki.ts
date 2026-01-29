@@ -62,6 +62,22 @@ const DEFAULT_PAGES = Object.keys(PAGE_DEFINITIONS);
 
 const WIKI_GENERATION_ABORTED = "WIKI_GENERATION_ABORTED";
 
+const throwIfAborted = (abortController: AbortController) => {
+  if (abortController.signal.aborted) {
+    throw new Error(WIKI_GENERATION_ABORTED);
+  }
+};
+
+const isAbortError = (error: unknown, abortController: AbortController) => {
+  if (abortController.signal.aborted) return true;
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message === WIKI_GENERATION_ABORTED ||
+    error.name === "AbortError" ||
+    /aborted/i.test(error.message)
+  );
+};
+
 function normalizePath(input: string): string {
   return input.replace(/\\/g, "/");
 }
@@ -268,9 +284,7 @@ async function generateMarkdown(
 
     let output = "";
     for await (const msg of q) {
-      if (abortController.signal.aborted) {
-        throw new Error(WIKI_GENERATION_ABORTED);
-      }
+      throwIfAborted(abortController);
 
       if (msg.type === "stream_event" && msg.event?.type === "content_block_delta") {
         const delta = (msg.event as any).delta;
@@ -284,16 +298,11 @@ async function generateMarkdown(
       }
     }
 
-    if (abortController.signal.aborted) {
-      throw new Error(WIKI_GENERATION_ABORTED);
-    }
+    throwIfAborted(abortController);
 
     return output.trim();
   } catch (error) {
-    if (
-      abortController.signal.aborted ||
-      (error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message)))
-    ) {
+    if (isAbortError(error, abortController)) {
       throw new Error(WIKI_GENERATION_ABORTED);
     }
 
@@ -316,12 +325,6 @@ export async function* generateWikiEvents(
 ): AsyncGenerator<WikiEvent> {
   const abortController = options?.abortController ?? new AbortController();
 
-  const throwIfAborted = () => {
-    if (abortController.signal.aborted) {
-      throw new Error(WIKI_GENERATION_ABORTED);
-    }
-  };
-
   try {
     if (!process.env.ANTHROPIC_AUTH_TOKEN) {
       yield { type: "error", code: "MISSING_TOKEN", message: "ANTHROPIC_AUTH_TOKEN is not set" };
@@ -332,7 +335,7 @@ export async function* generateWikiEvents(
       return;
     }
 
-    throwIfAborted();
+    throwIfAborted(abortController);
 
     const cwd = params.cwd;
     const pages = Array.isArray(params.pages) && params.pages.length ? params.pages : DEFAULT_PAGES;
@@ -340,7 +343,7 @@ export async function* generateWikiEvents(
     yield { type: "progress", phase: "scanning", pct: 5, message: "Scanning workspace" };
 
     const context = await collectQuickContext(params);
-    throwIfAborted();
+    throwIfAborted(abortController);
 
     const safeEvidence = filterSensitiveNotes(context.evidenceNotes, params.sensitivePaths || []);
     const degrade = context.limitExceeded;
@@ -356,7 +359,7 @@ export async function* generateWikiEvents(
     let manifest = context.manifest;
 
     if (context.homeMissing) {
-      throwIfAborted();
+      throwIfAborted(abortController);
       const prompt = buildUserPrompt({
         page: "Home.md",
         manifest: context.manifest,
@@ -365,7 +368,7 @@ export async function* generateWikiEvents(
         extraNotes: "Home.md 缺失，请先生成 Manifest。",
       });
       const markdown = await generateMarkdown(prompt, cwd, abortController);
-      throwIfAborted();
+      throwIfAborted(abortController);
 
       const confidence = extractConfidence(markdown);
       const blindSpots = extractBlindSpots(markdown);
@@ -385,7 +388,7 @@ export async function* generateWikiEvents(
 
     for (const page of targetPages) {
       if (page === "Home.md") continue;
-      throwIfAborted();
+      throwIfAborted(abortController);
       yield { type: "progress", phase: "drafting", pct, page, message: `Drafting ${page}` };
 
       const outline = PAGE_DEFINITIONS[page]?.outline ?? "";
@@ -397,7 +400,7 @@ export async function* generateWikiEvents(
         extraNotes: degrade ? "仓库规模较大，允许低置信度并列出盲区。" : undefined,
       });
       const markdown = await generateMarkdown(prompt, cwd, abortController);
-      throwIfAborted();
+      throwIfAborted(abortController);
 
       const confidence = extractConfidence(markdown);
       const blindSpots = extractBlindSpots(markdown);
@@ -412,14 +415,11 @@ export async function* generateWikiEvents(
       pct = Math.min(90, pct + perPage);
     }
 
-    throwIfAborted();
+    throwIfAborted(abortController);
     yield { type: "progress", phase: "writing", pct: 95, message: "Finalizing" };
     yield { type: "done" };
   } catch (error) {
-    if (
-      abortController.signal.aborted ||
-      (error instanceof Error && error.message === WIKI_GENERATION_ABORTED)
-    ) {
+    if (isAbortError(error, abortController)) {
       // Client cancelled / stream aborted. Stop silently.
       return;
     }
