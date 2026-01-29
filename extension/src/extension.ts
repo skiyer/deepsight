@@ -15,8 +15,6 @@ export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("DeepSight Debug");
   outputChannel.appendLine("DeepSight extension activated");
 
-  console.log("DeepSight extension activated");
-
   // Register CodeLens provider
   const codeLensProvider = new DeepSightCodeLensProvider();
   const codeLensDisposable = vscode.languages.registerCodeLensProvider(
@@ -678,6 +676,4 @@ function getToolDisplayInfo(toolName: string, input: any): string {
   }
 }
 
-export function deactivate() {
-  console.log("DeepSight extension deactivated");
-}
+export function deactivate() {}
