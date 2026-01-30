@@ -2,6 +2,15 @@ import path from "node:path";
 import * as vscode from "vscode";
 import { DeepSightCodeLensProvider } from "./codelens";
 import { DeepSightViewProvider } from "./webview";
+import {
+  getSensitivePaths,
+  getServerUrl,
+  getWikiLimits,
+  getWikiScope,
+} from "./utils/config";
+import { buildFrontMatter, splitFrontMatter } from "./utils/frontmatter";
+import { extractSymbolName } from "./utils/symbols";
+import { getToolDisplayInfo } from "./utils/toolDisplay";
 
 // Debug output channel
 let outputChannel: vscode.OutputChannel;
@@ -9,17 +18,6 @@ let outputChannel: vscode.OutputChannel;
 let viewProvider: DeepSightViewProvider;
 let isAnalyzing = false;
 let wikiAbortController: AbortController | null = null;
-
-const SYMBOL_PATTERNS: RegExp[] = [
-  // JavaScript/TypeScript: function, class, arrow function assignment
-  /(?:function|class)\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=/,
-  // Python: def, class
-  /(?:def|class)\s+(\w+)/,
-  // Go/Rust: func, fn, struct, impl
-  /(?:func|fn|struct|impl)\s+(?:\([^)]+\)\s+)?(\w+)/,
-  // C/C++/Java: function/method with return type
-  /(?:void|int|char|float|double|bool|auto|static|inline|public|private|protected|virtual|final|explicit|constexpr)\s+(?:[\w<>[\]]+\s+)*(\w+)\s*\(/,
-];
 
 const getBasename = (value: string) => path.basename(value);
 
@@ -103,58 +101,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-function getServerUrl(): string {
-  const config = vscode.workspace.getConfiguration("deepsight");
-  const port = config.get<number>("serverPort", 3000);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`Invalid server port: ${port}`);
-  }
-  return `http://localhost:${port}`;
-}
-
-function getWikiScope(): { include: string[]; exclude: string[] } {
-  const config = vscode.workspace.getConfiguration("deepsight");
-  const include = ["server", "extension"];
-  const exclude = config.get<string[]>("wiki.excludePatterns", [
-    "**/node_modules/**",
-    "**/.git/**",
-    "**/dist/**",
-    "**/build/**",
-  ]);
-  return { include, exclude };
-}
-
-function getSensitivePaths(): string[] {
-  const config = vscode.workspace.getConfiguration("deepsight");
-  return config.get<string[]>("wiki.sensitivePaths", [
-    ".env",
-    ".env.*",
-    "**/*.pem",
-    "**/*.key",
-    "**/credentials*.json",
-  ]);
-}
-
-function getWikiLimits(): { maxFilesRead: number; maxBytesRead: number } {
-  const config = vscode.workspace.getConfiguration("deepsight");
-  const maxFilesRead = config.get<number>("wiki.maxFilesRead", 400);
-  const maxBytesRead = config.get<number>("wiki.maxBytesRead", 2 * 1024 * 1024);
-  return { maxFilesRead, maxBytesRead };
-}
-
-function extractSymbolName(lineText: string): string | null {
-  for (const pattern of SYMBOL_PATTERNS) {
-    const match = lineText.match(pattern);
-    if (!match) continue;
-    for (let i = 1; i < match.length; i++) {
-      if (match[i]) {
-        return match[i];
-      }
-    }
-  }
-  return null;
-}
-
 async function analyzeCode(
   document: vscode.TextDocument,
   line: number,
@@ -166,7 +112,7 @@ async function analyzeCode(
   }
   isAnalyzing = true;
 
-  const serverUrl = getServerUrl();
+  const serverUrl = getServerUrl(vscode.workspace.getConfiguration("deepsight"));
 
   const filePath = document.uri.fsPath;
   const fileName = getBasename(filePath) || filePath;
@@ -282,10 +228,11 @@ async function generateWiki() {
   }
 
   const cwd = workspaceFolder.uri.fsPath;
-  const serverUrl = getServerUrl();
-  const scope = getWikiScope();
-  const sensitivePaths = getSensitivePaths();
-  const limits = getWikiLimits();
+  const config = vscode.workspace.getConfiguration("deepsight");
+  const serverUrl = getServerUrl(config);
+  const scope = getWikiScope(config);
+  const sensitivePaths = getSensitivePaths(config);
+  const limits = getWikiLimits(config);
 
   const requestBody = {
     cwd,
@@ -487,71 +434,6 @@ async function readWikiPageSafe(uri: vscode.Uri): Promise<{ frontMatter: string;
   }
 }
 
-function splitFrontMatter(markdown: string): { frontMatter: string; body: string } {
-  if (!markdown.startsWith("---")) return { frontMatter: "", body: markdown };
-  const lines = markdown.split("\n");
-  if (lines.length < 3) return { frontMatter: "", body: markdown };
-  if (lines[0].trim() !== "---") return { frontMatter: "", body: markdown };
-  let end = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === "---") {
-      end = i;
-      break;
-    }
-  }
-  if (end === -1) return { frontMatter: "", body: markdown };
-  const frontMatter = lines.slice(1, end).join("\n").trim();
-  const body = lines.slice(end + 1).join("\n").replace(/^\n+/, "");
-  return { frontMatter, body };
-}
-
-function parseFrontMatter(frontMatter: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const line of frontMatter.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const idx = trimmed.indexOf(":");
-    if (idx === -1) continue;
-    const key = trimmed.slice(0, idx).trim();
-    const value = trimmed.slice(idx + 1).trim();
-    if (key) out[key] = value;
-  }
-  return out;
-}
-
-function buildFrontMatter(params: {
-  title: string;
-  now: string;
-  existingFrontMatter: string;
-  confidence: "low" | "medium" | "high";
-  blindSpots?: string[];
-  scope: { include: string[]; exclude: string[] };
-  serverUrl: string;
-}): string {
-  const existing = parseFrontMatter(params.existingFrontMatter);
-  const created = existing.created || params.now;
-  const model = existing.model || "";
-  const blindSpots = params.blindSpots && params.blindSpots.length
-    ? `[${params.blindSpots.map((v) => `"${v}"`).join(", ")}]`
-    : existing.blindSpots || "[]";
-  const scopeBlock = `scope:\n  include: [${params.scope.include.map((v) => `"${v}"`).join(", ")}]\n  exclude: [${params.scope.exclude.map((v) => `"${v}"`).join(", ")}]`;
-
-  return [
-    "---",
-    `title: ${params.title}`,
-    `created: ${created}`,
-    `updated: ${params.now}`,
-    `generatedBy: deepsight`,
-    `generatedAt: ${params.now}`,
-    `serverUrl: ${params.serverUrl}`,
-    model ? `model: ${model}` : "model: ",
-    scopeBlock,
-    `confidence: ${params.confidence}`,
-    `blindSpots: ${blindSpots}`,
-    "---",
-  ].join("\n");
-}
-
 async function writeFileAtomically(uri: vscode.Uri, content: string): Promise<void> {
   const encoder = new TextEncoder();
   const bytes = encoder.encode(content);
@@ -653,28 +535,6 @@ function handleSSEMessage(msg: any, msgIndex: number): boolean {
   }
 
   return false;
-}
-
-function getToolDisplayInfo(toolName: string, input: any): string {
-  switch (toolName) {
-    case "Read":
-      return input.file_path ? getBasename(String(input.file_path)) : "";
-    case "Glob":
-      return input.pattern ? `${input.pattern}` : "";
-    default: {
-      let summary = "";
-      if (input === undefined || input === null) {
-        summary = "";
-      } else if (typeof input === "string") {
-        summary = input;
-      } else if (typeof input === "object") {
-        summary = JSON.stringify(input);
-      } else {
-        summary = String(input);
-      }
-      return summary || "—";
-    }
-  }
 }
 
 export function deactivate() {}

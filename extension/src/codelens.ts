@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
+import { collectRelevantSymbolLines } from "./utils/codelens";
 
-const RELEVANT_SYMBOL_KINDS = new Set<vscode.SymbolKind>([
+const RELEVANT_SYMBOL_KINDS = new Set<number>([
   vscode.SymbolKind.Function,
   vscode.SymbolKind.Method,
   vscode.SymbolKind.Class,
@@ -46,42 +47,14 @@ export class DeepSightCodeLensProvider implements vscode.CodeLensProvider {
     }
   }
 
-  private isRelevantSymbol(symbol: vscode.DocumentSymbol): boolean {
-    return RELEVANT_SYMBOL_KINDS.has(symbol.kind);
-  }
-
-  private collectRelevantSymbols(
-    symbols: vscode.DocumentSymbol[],
-    result: vscode.DocumentSymbol[] = []
-  ): vscode.DocumentSymbol[] {
-    for (const symbol of symbols) {
-      if (this.isRelevantSymbol(symbol)) {
-        result.push(symbol);
-      }
-      if (symbol.children.length > 0) {
-        this.collectRelevantSymbols(symbol.children, result);
-      }
-    }
-    return result;
-  }
-
   private createCodeLensesFromSymbols(
     symbols: vscode.DocumentSymbol[],
     document: vscode.TextDocument
   ): vscode.CodeLens[] {
     const codeLenses: vscode.CodeLens[] = [];
-    const relevantSymbols = this.collectRelevantSymbols(symbols);
-    const lineSet = new Set<number>();
+    const lines = collectRelevantSymbolLines(symbols, RELEVANT_SYMBOL_KINDS);
 
-    for (const symbol of relevantSymbols) {
-      const line = symbol.range.start.line;
-
-      // 防止同一行重复
-      if (lineSet.has(line)) {
-        continue;
-      }
-      lineSet.add(line);
-
+    for (const line of lines) {
       // 在符号名称前创建CodeLens
       const range = new vscode.Range(line, 0, line, 0);
 
