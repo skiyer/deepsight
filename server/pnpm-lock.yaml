@@ -20,9 +20,6 @@ importers:
       hono:
         specifier: ^4.11.4
         version: 4.11.4
-      zod:
-        specifier: ^3.25.76
-        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.19.6

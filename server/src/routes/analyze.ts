@@ -1,21 +1,54 @@
-import { Hono } from "hono";
-import { z } from "zod";
+import { Hono, type Context } from "hono";
 import type { AgentMessage } from "../llm/types.js";
-import { analyze } from "../agent.js";
-import { parseJson } from "./validate.js";
+import { analyze, type AnalyzeParams } from "../agent.js";
 import { streamSseEvents } from "./sse.js";
 
 const analyzeRouter = new Hono();
 
-const AnalyzeRequestSchema = z.object({
-  file: z.string(),
-  line: z.number(),
-  lineText: z.string(),
-  mode: z.enum(["explain", "audit"]),
-  cwd: z.string(),
-});
-
 type AnalyzeSseEvent = { event: string; data: AgentMessage };
+
+type ParseResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; response: Response };
+
+const parseAnalyzeBody = async (c: Context): Promise<ParseResult<AnalyzeParams>> => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return { ok: false, response: c.json({ error: "Invalid JSON" }, 400) };
+  }
+
+  if (!body || typeof body !== "object") {
+    return { ok: false, response: c.json({ error: "Invalid request" }, 400) };
+  }
+
+  const { file, line, lineText, mode, cwd } = body as Record<string, unknown>;
+
+  const isMode = mode === "explain" || mode === "audit";
+
+  if (
+    typeof file !== "string" ||
+    typeof line !== "number" ||
+    !Number.isFinite(line) ||
+    typeof lineText !== "string" ||
+    typeof cwd !== "string" ||
+    !isMode
+  ) {
+    return { ok: false, response: c.json({ error: "Invalid request" }, 400) };
+  }
+
+  return {
+    ok: true,
+    data: {
+      file,
+      line,
+      lineText,
+      mode,
+      cwd,
+    },
+  };
+};
 
 const toAnalyzeEvent = (msg: AgentMessage): AnalyzeSseEvent | null => {
   if (msg.type === "stream_event") {
@@ -29,7 +62,7 @@ const toAnalyzeEvent = (msg: AgentMessage): AnalyzeSseEvent | null => {
 };
 
 analyzeRouter.post("/", async (c) => {
-  const parsed = await parseJson(c, AnalyzeRequestSchema);
+  const parsed = await parseAnalyzeBody(c);
   if (!parsed.ok) {
     return parsed.response;
   }

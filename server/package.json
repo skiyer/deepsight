@@ -6,15 +6,14 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --minify --external:dotenv --external:hono --external:@anthropic-ai/claude-agent-sdk --external:zod --external:@hono/node-server",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --minify --external:dotenv --external:hono --external:@anthropic-ai/claude-agent-sdk --external:@hono/node-server",
     "start:prod": "node dist/index.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.20",
     "@hono/node-server": "^1.19.9",
     "dotenv": "^16.6.1",
-    "hono": "^4.11.4",
-    "zod": "^3.25.76"
+    "hono": "^4.11.4"
   },
   "devDependencies": {
     "@types/node": "^22.19.6",
