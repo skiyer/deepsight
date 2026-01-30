@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { WIKI_PROMPT } from "./prompts.js";
 import { createClaudeQuery } from "./llm/claude.js";
-import { hasClaudeCli } from "./runtime/diagnostics.js";
 import { isAbortError } from "./runtime/abort.js";
 
 export type WikiEvent =
@@ -332,11 +331,6 @@ export async function* generateWikiEvents(
       yield { type: "error", code: "MISSING_TOKEN", message: "ANTHROPIC_AUTH_TOKEN is not set" };
       return;
     }
-    if (!hasClaudeCli()) {
-      yield { type: "error", code: "MISSING_CLAUDE_CLI", message: "Claude CLI not found in PATH" };
-      return;
-    }
-
     throwIfAborted(abortController);
 
     const cwd = params.cwd;

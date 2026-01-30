@@ -1,7 +1,6 @@
 import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
 import { createClaudeQuery } from "./llm/claude.js";
 import type { AgentMessage } from "./llm/types.js";
-import { resolveWorkspacePaths } from "./runtime/paths.js";
 import { isAbortError } from "./runtime/abort.js";
 
 export interface AnalyzeParams {
@@ -41,9 +40,7 @@ export async function* analyze(
   params: AnalyzeParams,
   options?: { abortController?: AbortController }
 ): AsyncGenerator<AgentMessage> {
-  // Convert paths if running in WSL
-  const resolvedPaths = resolveWorkspacePaths({ cwd: params.cwd, file: params.file });
-  const { cwd, file } = resolvedPaths;
+  const { cwd, file } = params;
 
   const systemPrompt = SYSTEM_PROMPTS[params.mode];
 

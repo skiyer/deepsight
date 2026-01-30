@@ -21,15 +21,9 @@ const toAnalyzeEvent = (msg: AgentMessage): AnalyzeSseEvent | null => {
   if (msg.type === "stream_event") {
     return { event: "chunk", data: msg };
   }
-  if (msg.type === "assistant") {
-    return { event: "message", data: msg };
-  }
   if (msg.type === "result") {
     const event = msg.subtype === "success" ? "done" : "error";
     return { event, data: msg };
-  }
-  if (msg.type === "system") {
-    return { event: "system", data: msg };
   }
   return null;
 };
