@@ -1,5 +1,5 @@
 import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
-import { createAgentQuery } from "./llm/client.js";
+import { createClaudeQuery } from "./llm/claude.js";
 import type { AgentMessage } from "./llm/types.js";
 import { resolveWorkspacePaths } from "./runtime/paths.js";
 import { isAbortError } from "./runtime/abort.js";
@@ -11,8 +11,6 @@ export interface AnalyzeParams {
   mode: "explain" | "audit";
   cwd: string;
 }
-
-const DEBUG_PROMPT = process.env.DEBUG_PROMPT === "true";
 
 const SYSTEM_PROMPTS = {
   explain: EXPLAIN_PROMPT,
@@ -47,19 +45,6 @@ export async function* analyze(
   const resolvedPaths = resolveWorkspacePaths({ cwd: params.cwd, file: params.file });
   const { cwd, file } = resolvedPaths;
 
-  if (resolvedPaths.converted) {
-    console.log("[analyze] WSL path conversion:");
-    console.log("  cwd:", params.cwd, "->", cwd);
-    console.log("  file:", params.file, "->", file);
-  }
-
-  console.log("[analyze] Starting analysis:", {
-    file,
-    line: params.line,
-    mode: params.mode,
-    cwd,
-  });
-
   const systemPrompt = SYSTEM_PROMPTS[params.mode];
 
   const focusLineCode = params.lineText.trim() || "[无法获取焦点行代码]";
@@ -71,50 +56,17 @@ export async function* analyze(
     mode: params.mode,
   });
 
-  // 调试日志：显示完整的prompt输入
-  if (DEBUG_PROMPT) {
-    console.log("=".repeat(80));
-    console.log("[PROMPT DEBUG] System Prompt:");
-    console.log("=".repeat(80));
-    console.log(systemPrompt);
-    console.log("=".repeat(80));
-
-    console.log("\n" + "=".repeat(80));
-    console.log("[PROMPT DEBUG] User Prompt:");
-    console.log("=".repeat(80));
-    console.log(userPrompt);
-    console.log("=".repeat(80));
-
-    console.log(`\n[PROMPT DEBUG] Stats: System=${systemPrompt.length} chars, User=${userPrompt.length} chars, Total=${systemPrompt.length + userPrompt.length} chars`);
-    console.log("=".repeat(80) + "\n");
-  }
-
-  console.log("[analyze] Creating query with options:", {
-    cwd,
-    executable: "node",
-    permissionMode: "bypassPermissions",
-    includePartialMessages: true,
-  });
-
   try {
-    const q = createAgentQuery({
+    const q = createClaudeQuery({
       prompt: userPrompt,
       cwd,
       systemPrompt,
       abortController: options?.abortController,
     });
 
-    console.log("[analyze] Query created, starting iteration...");
-
-    let messageCount = 0;
     for await (const msg of q) {
-      messageCount++;
-      console.log(`[analyze] Message #${messageCount}:`, msg.type,
-        msg.type === "result" ? `(subtype: ${(msg as any).subtype})` : "");
       yield msg;
     }
-
-    console.log(`[analyze] Completed. Total messages: ${messageCount}`);
   } catch (error) {
     if (isAbortError(error, options?.abortController)) {
       return;

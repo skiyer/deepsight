@@ -4,13 +4,10 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { analyzeRouter } from "./routes/analyze.js";
 import { wikiRouter } from "./routes/wiki.js";
-import { logAgentEnvironment } from "./runtime/diagnostics.js";
 
 const DEFAULT_PORT = 3000;
 
 const app = new Hono();
-
-logAgentEnvironment();
 
 // Enable CORS for VS Code extension
 app.use("/*", cors({
@@ -18,11 +15,6 @@ app.use("/*", cors({
   allowMethods: ["GET", "POST", "OPTIONS"],
   allowHeaders: ["Content-Type"],
 }));
-
-// Health check
-app.get("/health", (c) => {
-  return c.json({ status: "ok", timestamp: new Date().toISOString() });
-});
 
 // Analyze endpoint
 app.route("/analyze", analyzeRouter);

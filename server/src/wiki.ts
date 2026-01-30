@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { WIKI_PROMPT } from "./prompts.js";
-import { createAgentQuery } from "./llm/client.js";
+import { createClaudeQuery } from "./llm/claude.js";
 import { hasClaudeCli } from "./runtime/diagnostics.js";
 import { isAbortError } from "./runtime/abort.js";
 
@@ -277,7 +277,7 @@ async function generateMarkdown(
   abortController: AbortController
 ): Promise<string> {
   try {
-    const q = createAgentQuery({
+    const q = createClaudeQuery({
       prompt,
       cwd,
       systemPrompt: WIKI_PROMPT,
