@@ -39,67 +39,6 @@ pnpm start
 | `ANTHROPIC_AUTH_TOKEN` | Required. Your Anthropic API authentication token | - |
 | `ANTHROPIC_BASE_URL` | Optional. Anthropic API base URL | `https://api.anthropic.com` |
 | `DEEPSIGHT_PORT` | Optional. Server port (use `DEEPSIGHT_PORT` in Docker to avoid conflict with code-server) | `3000` |
-| `DEBUG_PROMPT` | Optional. Enable detailed prompt logging. See Debug section. | `false` |
-
-## Debug
-
-### Viewing Complete Prompt Input
-
-Enable `DEBUG_PROMPT=true` in your `.env` file to see the complete system and user prompts sent to Claude:
-
-```bash
-DEBUG_PROMPT=true
-```
-
-Server startup will show the debug status:
-```
-=== DeepSight Agent Environment Debug ===
-Platform: darwin
-Is WSL: false
-...
-DEBUG_PROMPT: ENABLED
-=========================================
-```
-
-When enabled, the server console will display:
-
-```
-================================================================================
-[PROMPT DEBUG] System Prompt:
-================================================================================
-[完整的系统提示词内容]
-================================================================================
-
-================================================================================
-[PROMPT DEBUG] User Prompt:
-================================================================================
-请分析以下代码（文件：test.c，焦点行：42）：
-
-```c
-void processData(int* data, size_t len) {
-```
-
-请解释这段代码的功能和数据流。
-================================================================================
-
-[PROMPT DEBUG] Stats: System=892 chars, User=156 chars, Total=1048 chars
-================================================================================
-```
-
-**Note**: Only the code at the focus line is included in the prompt, not the entire file.
-
-### Other Debug Output
-
-The server provides several debug log categories:
-
-- `[analyze]` - Analysis start and configuration information
-- `[SDK stderr]` - SDK standard error output
-- `[SSE]` - Server-Sent Events messages
-- `[PROMPT DEBUG]` - Complete prompt content (when DEBUG_PROMPT=true)
-
-### Disabling Debug Output
-
-Set `DEBUG_PROMPT=false` or remove the line from `.env` to disable prompt logging.
 
 ## API Endpoints
 
@@ -124,12 +63,6 @@ Analyzes code and returns Server-Sent Events stream.
 - `tool_result` - Tool execution results
 - `done` - Analysis completed
 - `error` - Error occurred
-
-### GET /health
-
-Health check endpoint.
-
-**Response:** `200 OK` with text "OK"
 
 ## Architecture
 
