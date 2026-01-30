@@ -1,5 +1,77 @@
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentKnownMessageType, AgentMessage, AgentQueryParams } from "./types.js";
+
+type AgentStreamDelta = {
+  text?: string;
+  thinking?: string;
+  partial_json?: string;
+};
+
+type AgentContentBlock = {
+  type: "text" | "tool_use" | "thinking" | string;
+  id?: string;
+  name?: string;
+};
+
+type AgentStreamEvent = {
+  type: "stream_event";
+  event?: {
+    type?: string;
+    content_block?: AgentContentBlock;
+    delta?: AgentStreamDelta;
+  };
+};
+
+type AgentAssistantMessage = {
+  type: "assistant";
+  message?: {
+    content?: Array<{
+      type: string;
+      text?: string;
+      name?: string;
+    }>;
+  };
+};
+
+type AgentResultMessage = {
+  type: "result";
+  subtype?: string;
+};
+
+type AgentToolResultMessage = {
+  type: "tool_result";
+  tool_use_id?: string;
+};
+
+type AgentSystemMessage = {
+  type: "system";
+};
+
+type AgentKnownMessageType =
+  | "stream_event"
+  | "assistant"
+  | "result"
+  | "tool_result"
+  | "system";
+
+type AgentUnknownMessage = {
+  type: "unknown";
+  raw: unknown;
+};
+
+export type AgentMessage =
+  | AgentStreamEvent
+  | AgentAssistantMessage
+  | AgentResultMessage
+  | AgentToolResultMessage
+  | AgentSystemMessage
+  | AgentUnknownMessage;
+
+export interface AgentQueryParams {
+  prompt: string;
+  cwd: string;
+  systemPrompt: string;
+  abortController?: AbortController;
+}
 
 const ALLOWED_TOOLS = ["Read", "Glob"] as const;
 const SDK_ENV = process.env as Record<string, string>;

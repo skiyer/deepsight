@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
+import { streamSSE } from "hono/streaming";
 import { generateWikiEvents, type WikiGenerateParams } from "../wiki.js";
-import { streamSseEvents } from "./sse.js";
 
 const wikiRouter = new Hono();
 
@@ -100,17 +100,45 @@ wikiRouter.post("/generate", async (c) => {
 
   const params = parsed.data;
 
-  return streamSseEvents(c, {
-    createStream: (abortController) => generateWikiEvents(params, { abortController }),
-    toEvent: (event) => ({ event: event.type, data: event }),
-    onError: (error) => ({
-      event: "error",
-      data: {
-        type: "error",
-        code: "SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-    }),
+  return streamSSE(c, async (stream) => {
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
+    const abort = () => {
+      if (!signal.aborted) {
+        abortController.abort();
+      }
+    };
+
+    stream.onAbort(abort);
+    c.req.raw.signal?.addEventListener("abort", abort, { once: true });
+
+    const send = async (event: { event: string; data: unknown }) => {
+      await stream.writeSSE({
+        event: event.event,
+        data: JSON.stringify(event.data),
+      });
+    };
+
+    try {
+      for await (const item of generateWikiEvents(params, { abortController })) {
+        if (signal.aborted) break;
+        await send({ event: item.type, data: item });
+      }
+    } catch (error) {
+      if (!signal.aborted) {
+        await send({
+          event: "error",
+          data: {
+            type: "error",
+            code: "SERVER_ERROR",
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        });
+      }
+    } finally {
+      abort();
+    }
   });
 });
 

@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
-import type { AgentMessage } from "../llm/types.js";
+import { streamSSE } from "hono/streaming";
+import type { AgentMessage } from "../llm/claude.js";
 import { analyze, type AnalyzeParams } from "../agent.js";
-import { streamSseEvents } from "./sse.js";
 
 const analyzeRouter = new Hono();
 
@@ -69,15 +69,45 @@ analyzeRouter.post("/", async (c) => {
 
   const params = parsed.data;
 
-  return streamSseEvents(c, {
-    createStream: (abortController) => analyze(params, { abortController }),
-    toEvent: toAnalyzeEvent,
-    onError: (error) => ({
-      event: "error",
-      data: {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-    }),
+  return streamSSE(c, async (stream) => {
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
+    const abort = () => {
+      if (!signal.aborted) {
+        abortController.abort();
+      }
+    };
+
+    stream.onAbort(abort);
+    c.req.raw.signal?.addEventListener("abort", abort, { once: true });
+
+    const send = async (event: AnalyzeSseEvent) => {
+      await stream.writeSSE({
+        event: event.event,
+        data: JSON.stringify(event.data),
+      });
+    };
+
+    try {
+      for await (const item of analyze(params, { abortController })) {
+        if (signal.aborted) break;
+        const event = toAnalyzeEvent(item);
+        if (!event) continue;
+        await send(event);
+      }
+    } catch (error) {
+      if (!signal.aborted) {
+        await send({
+          event: "error",
+          data: {
+            error: error instanceof Error ? error.message : "Unknown error",
+          },
+        });
+      }
+    } finally {
+      abort();
+    }
   });
 });
 

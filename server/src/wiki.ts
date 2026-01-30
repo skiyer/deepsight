@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { WIKI_PROMPT } from "./prompts.js";
 import { createClaudeQuery } from "./llm/claude.js";
-import { isAbortError } from "./runtime/abort.js";
 
 export type WikiEvent =
   | {
@@ -82,6 +81,12 @@ const createAbortError = () => {
   const error = new Error(WIKI_GENERATION_ABORTED);
   error.name = "AbortError";
   return error;
+};
+
+const isAbortError = (error: unknown, abortController?: AbortController): boolean => {
+  if (abortController?.signal.aborted) return true;
+  if (!(error instanceof Error)) return false;
+  return error.name === "AbortError" || /aborted/i.test(error.message);
 };
 
 const throwIfAborted = (abortController: AbortController) => {

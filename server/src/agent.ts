@@ -1,7 +1,5 @@
 import { EXPLAIN_PROMPT, AUDIT_PROMPT } from "./prompts.js";
-import { createClaudeQuery } from "./llm/claude.js";
-import type { AgentMessage } from "./llm/types.js";
-import { isAbortError } from "./runtime/abort.js";
+import { createClaudeQuery, type AgentMessage } from "./llm/claude.js";
 
 export interface AnalyzeParams {
   file: string;
@@ -20,6 +18,12 @@ const MODE_INSTRUCTIONS = {
   explain: "请解释这段代码的功能和数据流。",
   audit: "请对这段代码进行安全审计。",
 } as const;
+
+const isAbortError = (error: unknown, abortController?: AbortController): boolean => {
+  if (abortController?.signal.aborted) return true;
+  if (!(error instanceof Error)) return false;
+  return error.name === "AbortError" || /aborted/i.test(error.message);
+};
 
 function buildUserPrompt(params: {
   file: string;
