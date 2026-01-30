@@ -7,7 +7,10 @@
     "dev": "tsx watch src/index.ts",
     "start": "node --import tsx src/index.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --minify --external:dotenv --external:hono --external:@anthropic-ai/claude-agent-sdk --external:@hono/node-server",
-    "start:prod": "node dist/index.js"
+    "start:prod": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.20",
@@ -17,8 +20,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.6",
+    "@vitest/coverage-v8": "^2.1.8",
     "esbuild": "^0.27.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   }
 }
