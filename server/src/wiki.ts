@@ -2,6 +2,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { WIKI_PROMPT } from "./prompts.js";
 import { createClaudeQuery } from "./llm/claude.js";
+import {
+  extractBlindSpots,
+  extractConfidence,
+  isExcludedPath,
+  isSensitivePath,
+  splitFrontMatter,
+} from "./wiki-utils.js";
 
 export type WikiEvent =
   | {
@@ -94,67 +101,6 @@ const throwIfAborted = (abortController: AbortController) => {
     throw createAbortError();
   }
 };
-
-
-function normalizePath(input: string): string {
-  return input.replace(/\\/g, "/");
-}
-
-function patternToRegex(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-  const withStars = escaped.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*");
-  return new RegExp(`^${withStars}$`);
-}
-
-function matchesPattern(normalizedPath: string, pattern: string): boolean {
-  const regex = patternToRegex(pattern);
-  if (regex.test(normalizedPath)) return true;
-  const withLeadingSlash = normalizedPath.startsWith("/")
-    ? normalizedPath
-    : `/${normalizedPath}`;
-  return regex.test(withLeadingSlash);
-}
-
-function isExcludedPath(targetPath: string, excludePatterns: string[]): boolean {
-  const normalized = normalizePath(targetPath);
-  return excludePatterns.some((pattern) => matchesPattern(normalized, pattern));
-}
-
-function isSensitivePath(targetPath: string, sensitivePaths: string[]): boolean {
-  const normalized = normalizePath(targetPath);
-  const base = normalized.split("/").pop() || normalized;
-  return sensitivePaths.some((pattern) => matchesPattern(normalized, pattern) || matchesPattern(base, pattern));
-}
-
-function splitFrontMatter(markdown: string): { frontMatter: string; body: string } {
-  if (!markdown.startsWith("---")) return { frontMatter: "", body: markdown };
-  const lines = markdown.split("\n");
-  let end = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === "---") {
-      end = i;
-      break;
-    }
-  }
-  if (end === -1) return { frontMatter: "", body: markdown };
-  return {
-    frontMatter: lines.slice(1, end).join("\n").trim(),
-    body: lines.slice(end + 1).join("\n").replace(/^\n+/, ""),
-  };
-}
-
-function extractConfidence(markdown: string): "low" | "medium" | "high" {
-  const match = markdown.match(/confidence\s*[:：]\s*(low|medium|high)/i);
-  if (match?.[1]) return match[1].toLowerCase() as "low" | "medium" | "high";
-  return "medium";
-}
-
-function extractBlindSpots(markdown: string): string[] | undefined {
-  const match = markdown.match(/blindSpots?\s*[:：]\s*\[([^\]]*)\]/i);
-  if (!match?.[1]) return undefined;
-  const raw = match[1].split(",").map((v) => v.trim()).filter(Boolean);
-  return raw.length ? raw : undefined;
-}
 
 async function readFileSafe(
   filePath: string,
