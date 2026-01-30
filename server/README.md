@@ -50,18 +50,16 @@ Analyzes code and returns Server-Sent Events stream.
 ```json
 {
   "file": "/path/to/file.c",
-  "code": "void foo() { ... }",
   "line": 42,
+  "lineText": "void foo() { ... }",
   "mode": "explain" | "audit",
   "cwd": "/working/directory"
 }
 ```
 
 **Response:** Server-Sent Events stream with message types:
-- `stream_event` - Partial content updates
-- `message` - Complete assistant messages
-- `tool_result` - Tool execution results
-- `done` - Analysis completed
+- `chunk` - Streaming deltas (`stream_event` payloads)
+- `done` - Analysis completed (`result` payload)
 - `error` - Error occurred
 
 ## Architecture
@@ -76,4 +74,3 @@ The server uses:
 
 - Tools are limited to `Read` and `Glob` only
 - Permission mode is set to `bypassPermissions`
-- WSL path conversion supported for Windows Subsystem for Linux
