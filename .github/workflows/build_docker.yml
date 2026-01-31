@@ -37,12 +37,3 @@ jobs:
       - name: build visx
         run: bash -c "docker/build.sh"
 
-      - name: Build and push remote-command-api-image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/skiyer/deepsight:latest
-          file: docker/Dockerfile
