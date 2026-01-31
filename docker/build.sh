@@ -4,18 +4,23 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "🔨 步骤 1/3: 构建 WebView UI..."
+echo "🔨 步骤 1/4: 构建 WebView UI..."
 cd "$PROJECT_ROOT/extension/webview-ui"
 pnpm install
 pnpm build
 
-echo "📦 步骤 2/3: 编译并打包扩展..."
+echo "📦 步骤 2/4: 编译并打包扩展..."
 cd "$PROJECT_ROOT/extension"
 pnpm install
 pnpm compile
 pnpm package
 
-echo "📋 步骤 3/3: 准备 VSIX 文件..."
+echo "🖥️ 步骤 3/4: 编译 Server..."
+cd "$PROJECT_ROOT/server"
+pnpm install
+pnpm build
+
+echo "📋 步骤 4/4: 准备 VSIX 文件..."
 LATEST_VSIX=$(ls -t deepsight-*.vsix 2>/dev/null | head -1)
 if [ -z "$LATEST_VSIX" ]; then
   echo "❌ 未找到 vsix 文件"
