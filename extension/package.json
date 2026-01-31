@@ -2,7 +2,7 @@
   "name": "deepsight",
   "displayName": "DeepSight",
   "description": "AI-powered code explanation and security auditing",
-  "version": "1.0.0",
+  "version": "2026.1.31",
   "publisher": "deepsight",
   "repository": {
     "type": "git",
@@ -28,7 +28,9 @@
     "onCommand:deepsight.generateWiki",
     "onCommand:deepsight.cancelWiki",
     "onCommand:deepsight.explain",
-    "onCommand:deepsight.audit"
+    "onCommand:deepsight.audit",
+    "onCommand:deepsight.explainAtLine",
+    "onCommand:deepsight.auditAtLine"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -40,6 +42,14 @@
       {
         "command": "deepsight.audit",
         "title": "DeepSight: Security Audit"
+      },
+      {
+        "command": "deepsight.explainAtLine",
+        "title": "DeepSight: ✨ 解释当前行"
+      },
+      {
+        "command": "deepsight.auditAtLine",
+        "title": "DeepSight: 🛡️ 审计当前行"
       },
       {
         "command": "deepsight.openWiki",
@@ -54,6 +64,20 @@
         "title": "DeepSight: Cancel Wiki Generation"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "deepsight.explainAtLine",
+          "when": "editorTextFocus",
+          "group": "navigation@98"
+        },
+        {
+          "command": "deepsight.auditAtLine",
+          "when": "editorTextFocus",
+          "group": "navigation@99"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {

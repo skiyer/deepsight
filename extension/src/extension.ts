@@ -79,6 +79,20 @@ export function activate(context: vscode.ExtensionContext) {
     cancelWikiGeneration();
   });
 
+  const explainAtLineCommand = vscode.commands.registerCommand(
+    "deepsight.explainAtLine",
+    async () => {
+      await analyzeAtCustomLine("explain");
+    }
+  );
+
+  const auditAtLineCommand = vscode.commands.registerCommand(
+    "deepsight.auditAtLine",
+    async () => {
+      await analyzeAtCustomLine("audit");
+    }
+  );
+
   // Command to show debug output
   const showDebugCommand = vscode.commands.registerCommand(
     "deepsight.showDebug",
@@ -93,12 +107,32 @@ export function activate(context: vscode.ExtensionContext) {
     viewProvider,
     explainCommand,
     auditCommand,
+    explainAtLineCommand,
+    auditAtLineCommand,
     openWikiCommand,
     generateWikiCommand,
     cancelWikiCommand,
     showDebugCommand,
     outputChannel
   );
+}
+
+async function analyzeAtCustomLine(mode: "explain" | "audit"): Promise<void> {
+  if (isAnalyzing) {
+    vscode.window.showInformationMessage("DeepSight: 正在分析中，请等待完成。");
+    return;
+  }
+
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    vscode.window.showErrorMessage("DeepSight: 没有可用的编辑器。");
+    return;
+  }
+
+  const document = editor.document;
+  const line = editor.selection.active.line;
+
+  await analyzeCode(document, line, mode);
 }
 
 async function analyzeCode(
