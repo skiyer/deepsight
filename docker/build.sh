@@ -21,6 +21,7 @@ pnpm install
 pnpm build
 
 echo "📋 步骤 4/4: 准备 VSIX 文件..."
+cd "$PROJECT_ROOT/extension"
 LATEST_VSIX=$(ls -t deepsight-*.vsix 2>/dev/null | head -1)
 if [ -z "$LATEST_VSIX" ]; then
   echo "❌ 未找到 vsix 文件"
