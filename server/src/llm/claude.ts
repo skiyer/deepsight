@@ -73,11 +73,9 @@ export interface AgentQueryParams {
   abortController?: AbortController;
 }
 
-const ALLOWED_TOOLS = ["Read", "Glob"] as const;
 const SDK_ENV = process.env as Record<string, string>;
 
 const BASE_OPTIONS = {
-  allowedTools: ALLOWED_TOOLS,
   permissionMode: "bypassPermissions" as const,
   allowDangerouslySkipPermissions: true,
   includePartialMessages: true,

@@ -54,6 +54,11 @@ export const WIKI_PROMPT = `你是一个安全审计向的系统分析专家，�
 - 每页必须包含“必需章节”，并包含“## Evidence”
 - 证据不足时必须明确说明盲区，并降低置信度
 
+## 文档上下文
+- 使用 Glob 工具扫描项目文档（**/*.md, **/*.txt, **/*.docx, **/*.pptx）
+- 对于 \`.docx\`/\`.pptx\` 等二进制文档，转换后的文本位于 \`.deepsight/docs-cache/{原路径}.md\`
+- 引用文档内容时注明来源路径
+
 ## 固定页面模板（必需章节）
 
 ### Home.md（Manifest）
