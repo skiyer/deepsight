@@ -37,12 +37,22 @@ jobs:
       - name: build visx
         run: bash -c "docker/build.sh"
 
-      - name: Build and push remote-command-api-image
+      - name: Build and push deepsight-codeserver image
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/skiyer/deepsight:latest
+            ghcr.io/${{ github.repository_owner }}/deepsight:latest
           file: docker/Dockerfile
+
+      - name: Build and push deepsight-cli image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/deepsight-cli:latest
+          file: docker/Dockerfile.cli
