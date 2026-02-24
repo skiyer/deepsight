@@ -17,6 +17,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: |
+            extension/pnpm-lock.yaml
+            extension/webview-ui/pnpm-lock.yaml
+            server/pnpm-lock.yaml
+            cli/pnpm-lock.yaml
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -34,8 +45,21 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: build visx
-        run: bash -c "docker/build.sh"
+      - name: Build extension and server artifacts
+        run: |
+          pnpm -C extension/webview-ui install --frozen-lockfile
+          pnpm -C extension/webview-ui build
+          pnpm -C extension install --frozen-lockfile
+          pnpm -C extension compile
+          pnpm -C extension package
+          pnpm -C server install --frozen-lockfile
+          pnpm -C server build
+          LATEST_VSIX=$(ls -t extension/deepsight-*.vsix | head -1)
+          if [ -z "$LATEST_VSIX" ]; then
+            echo "VSIX not found" >&2
+            exit 1
+          fi
+          cp "$LATEST_VSIX" docker/deepsight.vsix
 
       - name: Build and push deepsight-codeserver image
         uses: docker/build-push-action@v5
@@ -45,6 +69,8 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/deepsight:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           file: docker/Dockerfile
 
       - name: Build and push deepsight-cli image
@@ -55,4 +81,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/deepsight-cli:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           file: docker/Dockerfile.cli
