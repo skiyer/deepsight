@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+
+FROM node:24.13.0-bookworm-slim
+
+ENV NODE_ENV=development
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl python3 python3-venv \
+    && python3 -m venv /opt/markitdown \
+    && /opt/markitdown/bin/pip install --no-cache-dir markitdown \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Claude Code binary ---
+RUN set -eux; \
+    GCS_BUCKET="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"; \
+    version="$(curl -fsSL "$GCS_BUCKET/latest")"; \
+    arch="$(uname -m)"; \
+    if [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then platform="linux-arm64"; else platform="linux-x64"; fi; \
+    checksum="$(curl -fsSL "$GCS_BUCKET/$version/manifest.json" | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const m=JSON.parse(d);const p=m.platforms?.[process.argv[1]]?.checksum||"";process.stdout.write(p);});' "$platform")"; \
+    test -n "$checksum"; \
+    curl -fsSL -o /usr/local/bin/claude "$GCS_BUCKET/$version/$platform/claude"; \
+    echo "$checksum  /usr/local/bin/claude" | sha256sum -c -; \
+    chmod +x /usr/local/bin/claude; \
+    /usr/local/bin/claude --version
+
+RUN npm install -g pnpm
+
+COPY server/package.json server/pnpm-lock.yaml ./server/
+COPY cli/package.json ./cli/
+
+RUN pnpm -C server install --frozen-lockfile --prod=false \
+    && pnpm -C cli install --prod=false
+
+COPY server ./server
+COPY cli ./cli
+COPY docker/entrypoint-cli.sh /usr/local/bin/entrypoint-cli
+
+RUN pnpm -C server build \
+    && pnpm -C cli build \
+    && chmod +x /usr/local/bin/entrypoint-cli
+
+ENV NODE_ENV=production
+ENV DEEPSIGHT_WORKSPACE=/workspace
+ENV MARKITDOWN_PYTHON=/opt/markitdown/bin/python
+ENV DEEPSIGHT_PERMISSION_MODE=default
+
+ENTRYPOINT ["/usr/local/bin/entrypoint-cli"]
