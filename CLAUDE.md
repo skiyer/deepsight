@@ -1,207 +1,169 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for working with the DeepSight codebase.
 
-## Project Overview
+## Overview
 
-DeepSight is a VS Code extension for AI-powered code explanation and security auditing. Core design philosophy: **Chatless UI** - no chat interface, just CodeLens buttons (✨ Explain / 🛡️ Audit) that trigger analysis displayed in a sidebar.
-
-**Current State:** MVP implementation complete with modern React WebView UI.
-
-## Tech Stack
-
-- **Runtime:** Node.js + tsx (TypeScript)
-- **Backend:** Hono (HTTP + SSE streaming) with `@hono/node-server`
-- **Core Engine:** `@anthropic-ai/claude-agent-sdk`
-- **Frontend:** VS Code Extension (React WebView + CodeLens)
-- **WebView UI:** React 18 + Vite + TypeScript
-- **Markdown:** react-markdown + remark-gfm + react-syntax-highlighter
-- **Environment:** dotenv for configuration
+DeepSight is a VS Code extension for AI-powered code explanation and security auditing. Features a **Chatless UI** - actions via CodeLens buttons (✨ Explain / 🛡️ Audit) with results in a sidebar panel. Includes a **Wiki system** for generating security documentation.
 
 ## Project Structure
 
 ```
 deepsight/
-├── server/                      # Node.js + Hono backend
+├── extension/          # VS Code Extension
 │   ├── src/
-│   │   ├── index.ts             # HTTP entry point, loads dotenv
-│   │   ├── routes/
-│   │   │   └── analyze.ts       # POST /analyze → SSE streaming
-│   │   ├── agent.ts             # SDK query() wrapper, WSL path conversion
-│   │   └── prompts.ts           # Explain/Audit system prompts (Chinese)
-│   ├── .env.example             # Environment variables template
-│   ├── package.json
-│   └── tsconfig.json
+│   │   ├── extension.ts     # Entry point, commands, SSE handling
+│   │   ├── codelens.ts      # CodeLens provider for symbols
+│   │   ├── webview.ts       # State-sync WebView provider
+│   │   └── utils/           # Config, symbols, frontmatter helpers
+│   ├── webview-ui/          # React 18 + Vite WebView UI
+│   │   └── src/
+│   │       ├── App.tsx           # Main app with blocks rendering
+│   │       └── components/       # Markdown, ToolCall, Thinking, etc.
+│   └── package.json
 │
-├── extension/                   # VS Code extension
+├── server/             # Node.js + Hono backend
 │   ├── src/
-│   │   ├── extension.ts         # Extension entry, CodeLens, SSE parsing
-│   │   ├── codelens.ts          # CodeLens provider (functions/classes)
-│   │   └── webview.ts           # State-sync WebView provider
-│   ├── webview-ui/              # React WebView UI (Vite)
-│   │   ├── src/
-│   │   │   ├── main.tsx         # React entry
-│   │   │   ├── App.tsx          # Main app with state sync
-│   │   │   ├── App.css          # Global styles
-│   │   │   └── components/
-│   │   │       ├── Header.tsx           # Anchor + mode badge
-│   │   │       ├── MarkdownRenderer.tsx # react-markdown rendering
-│   │   │       ├── CodeBlock.tsx        # Syntax highlighting
-│   │   │       ├── Skeleton.tsx         # Loading skeleton
-│   │   │       ├── ToolCall.tsx         # Tool call indicator
-│   │   │       ├── Thinking.tsx         # Thinking process panel
-│   │   │       └── EmptyState.tsx       # Empty state
-│   │   ├── package.json
-│   │   └── vite.config.ts
-│   ├── LICENSE
-│   ├── package.json
-│   └── tsconfig.json
+│   │   ├── index.ts         # HTTP entry point
+│   │   ├── app.ts           # Hono app with routes
+│   │   ├── agent.ts         # Claude Agent SDK wrapper
+│   │   ├── wiki.ts          # Wiki generation engine
+│   │   └── routes/
+│   │       ├── analyze.ts   # POST /analyze → SSE
+│   │       └── wiki.ts      # POST /wiki/generate → SSE
+│   └── package.json
 │
-└── CLAUDE.md                    # This file
+└── cli/                # CLI tool for document scanning
+    └── src/
+        ├── index.ts
+        └── run.ts
 ```
 
-## Build Commands
+## Quick Start
 
 ```bash
-# Server
-pnpm -C server install
-pnpm -C server dev               # Development (tsx watch)
-pnpm -C server start             # Start server (tsx)
-pnpm -C server build             # Compile TypeScript
-pnpm -C server start:prod        # Run compiled code
-
-# Required env vars (see .env.example):
-# - ANTHROPIC_AUTH_TOKEN
-# - ANTHROPIC_BASE_URL (optional)
-# - PORT (optional, default: 3000)
-
-# Extension
+# Install all dependencies
 pnpm -C extension install
-pnpm -C extension/webview-ui install && pnpm -C extension/webview-ui build  # Build React UI first
-pnpm -C extension compile        # Build extension
-# Press F5 in VS Code to launch Extension Development Host
-pnpm -C extension package        # Package as .vsix
+pnpm -C server install
+pnpm -C cli install
+
+# Build and run server
+pnpm -C server dev          # Development (tsx watch)
+pnpm -C server start        # Production start
+
+# Build extension
+pnpm -C extension/webview-ui install
+pnpm -C extension/webview-ui build
+pnpm -C extension compile
+
+# Run tests
+pnpm -C extension test
+pnpm -C server test
+pnpm -C cli test
 ```
+
+**Required env vars** (server/.env):
+- `ANTHROPIC_AUTH_TOKEN` - Claude API token
+- `DEEPSIGHT_PORT` - Server port (default: 3000)
 
 ## Architecture
 
-### State Sync Architecture
-
-The extension uses a **State Sync** pattern where the Extension is the single source of truth:
+### State Sync Pattern
+Extension maintains complete state; WebView is pure display:
 
 ```
-┌─────────────────────┐   state_sync    ┌─────────────────────┐
-│     Extension       │ ═══════════════▶│      WebView        │
-│ (Single Source of   │  Complete state │  (Pure display)     │
-│  Truth)             │  on every update│  No accumulation    │
-│                     │                 │  needed             │
-│  ViewState {        │                 │                     │
-│    status,          │                 │  setState(state)    │
-│    content,         │                 │                     │
-│    thinking,        │                 │                     │
-│    toolCall,        │                 │                     │
-│    ...              │                 │                     │
-│  }                  │                 │                     │
-└─────────────────────┘                 └─────────────────────┘
+┌─────────────┐   state_sync    ┌─────────────┐
+│  Extension  │ ═══════════════▶│   WebView   │
+│(Single     │  Complete state │ (Display    │
+│ Source)     │  on every update│  only)      │
+└─────────────┘                 └─────────────┘
 ```
 
-**Benefits:**
-- Panel switching doesn't lose data
-- Message loss doesn't corrupt state
-- WebView rebuild auto-recovers full state
+**Benefits:** Panel switching doesn't lose data; message loss doesn't corrupt state.
 
-### Communication Flow
-1. User clicks CodeLens button (✨ Explain or 🛡️ Audit) above a function/class
-2. Extension focuses panel and waits for WebView ready
-3. Extension sends POST to `http://localhost:3000/analyze` with file content
-4. Server calls Agent SDK `query()`, streams messages via SSE
-5. Extension accumulates state and syncs to WebView on each update
-6. WebView renders complete state (Markdown + code highlighting)
+### Content Blocks
+Analysis content is rendered as sequential blocks:
 
-### SDK Message → Extension State Mapping
-| SDK Message Type | Extension Action |
-|------------------|------------------|
-| `content_block_start` (tool_use) | `setToolCall(name, "running")` |
-| `content_block_start` (thinking) | `setThinking("")` |
-| `content_block_delta` (text) | `appendContent(text)` |
-| `content_block_delta` (partial_json) | Log tool input |
-| `content_block_delta` (thinking) | `appendThinking(text)` |
-| `content_block_stop` | `clearToolCall()` |
-| `tool_result` | `clearToolCall()` |
-| Done | `setComplete()` |
+| Block Type | Purpose |
+|------------|---------|
+| `text` | Main markdown content |
+| `tool` | Tool call indicator (Read, Glob) |
+| `thinking` | AI thinking process |
 
-**Note:** `assistant` messages are skipped to avoid duplicate content.
+Blocks are created via `viewProvider.startBlock(type)` and appended via `appendToCurrentTextBlock()`.
 
-### API Endpoints
+### API Routes
+
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check |
-| POST | `/analyze` | Start streaming analysis (SSE) |
+| POST | `/analyze` | Analyze code at line (SSE stream) |
+| POST | `/wiki/generate` | Generate security wiki (SSE stream) |
 
-### ViewState Interface
+## Key Features
 
-```typescript
-interface ViewState {
-  status: "empty" | "loading" | "streaming" | "done" | "error";
-  anchor: string;           // e.g., "app.ts:processData"
-  mode: "explain" | "audit";
-  content: string;          // Accumulated markdown content
-  thinking: string;         // Accumulated thinking process
-  toolCall: {
-    name: string;           // e.g., "Read", "Glob"
-    status: "running" | "done";
-    info?: string;          // e.g., "📄 utils.ts"
-  } | null;
-  error: string;
-}
-```
+### 1. Code Analysis (Explain/Audit)
+- CodeLens buttons appear above functions/classes
+- Supports: C, C++, TypeScript, JavaScript, Python, Go, Rust, Java
+- Results stream in real-time via SSE
 
-## Key Design Decisions
+### 2. Wiki System
+Security documentation generator with pre-defined page types:
+- **Home** - Overview and navigation
+- **Architecture** - System components and boundaries
+- **Modules** - Module inventory and dependencies
+- **Dataflow** - Input-to-sink data paths
+- **Trust Boundaries** - Security boundaries and validation
+- **Attack Surface** - Exposed interfaces and risks
 
-1. **Chatless UI:** Actions via CodeLens buttons, no chat input
-2. **State Sync Pattern:** Extension is single source of truth, WebView is pure display
-3. **Streaming First:** SSE for real-time content updates
-4. **Modern WebView:** React 18 + Vite with syntax highlighting
-5. **Limited Tools:** `allowedTools: ["Read", "Glob"]` for security
-6. **Single File Scope:** MVP analyzes only the current file
-7. **WSL Support:** Automatic Windows-to-WSL path conversion
-8. **Tool Visibility:** Tool calls and thinking process shown in UI
+Wiki files stored in `.deepsight/wiki/` with YAML frontmatter.
+
+### 3. CLI Tool
+Document scanning and report generation:
+- Scans workspace for documents (.md, .docx, .pptx, .txt)
+- Converts binary docs using markitdown
+- Generates structured reports
 
 ## Configuration
 
-Server reads environment variables from `.env` file:
+VS Code settings (`deepsight.*`):
 
-```bash
-# server/.env
-ANTHROPIC_AUTH_TOKEN=your_token
-ANTHROPIC_BASE_URL=https://api.anthropic.com  # optional
-PORT=3000                                     # optional
-```
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `serverPort` | 3000 | Backend server port |
+| `wiki.excludePatterns` | `["**/node_modules/**", ...]` | Exclude from wiki scan |
+| `wiki.sensitivePaths` | `[".env", "*.pem", ...]` | Blocked sensitive paths |
+| `wiki.maxFilesRead` | 400 | Max files for wiki generation |
+| `wiki.maxBytesRead` | 2MB | Max bytes for wiki generation |
+
+## Commands
+
+| Command | Key | Description |
+|---------|-----|-------------|
+| `deepsight.explainAtLine` | - | Explain code at cursor |
+| `deepsight.auditAtLine` | - | Security audit at cursor |
+| `deepsight.openWiki` | - | Open Wiki panel |
+| `deepsight.generateWiki` | - | Generate security wiki |
+| `deepsight.cancelWiki` | - | Cancel wiki generation |
 
 ## Debugging
 
-- Server: Check console output for `[analyze]` and `[SDK stderr]` logs
-- Extension: Use `DeepSight Debug` output channel
-  - `[TOOL START]` / `[TOOL STOP]` - Tool call lifecycle
-  - `[THINKING]` - Thinking process content
-  - `[TEXT]` - Content being added
-  - `[MSG #N]` - All SSE messages
-- WebView: Receives complete `state_sync` messages
+**Extension:** Output channel "DeepSight Debug"
+- `[TOOL START/STOP]` - Tool lifecycle
+- `[THINKING]` - Thinking content
+- `[TEXT]` - Content chunks
 
-## WebView UI Components
+**Server:** Console logs with `[analyze]` prefix
 
-| Component | Purpose |
-|-----------|---------|
-| `Header` | Shows anchor (file:function) and mode badge |
-| `MarkdownRenderer` | Renders markdown with GFM support |
-| `CodeBlock` | Syntax highlighting with copy button |
-| `Skeleton` | Loading animation (shimmer effect) |
-| `ToolCall` | Shows active tool (📖 Read, 🔍 Glob, etc.) |
-| `Thinking` | Collapsible thinking process panel |
-| `EmptyState` | Initial state prompt |
+## File Locations
 
-## Reference Documentation
+- Extension entry: `extension/src/extension.ts`
+- WebView UI: `extension/webview-ui/src/App.tsx`
+- Server routes: `server/src/routes/`
+- Wiki engine: `server/src/wiki.ts`
+- Agent wrapper: `server/src/agent.ts`
+
+## References
 
 - `Architect.md` - Full technical architecture (Chinese)
-- `UI.md` - UI/UX design specification (Chinese)
+- `UI.md` - UI/UX design spec (Chinese)
 - `Agent_SDK_ref.md` - Claude Agent SDK API reference
